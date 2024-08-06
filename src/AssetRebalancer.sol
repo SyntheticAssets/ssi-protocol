@@ -49,7 +49,7 @@ contract AssetRebalancer is AssetController, IAssetRebalancer {
         for (uint i = 0; i < newTokenset.length; i++) {
             require(newTokenset[i].amount > 0, "too little left in new basket");
         }
-        swap.addSwapRequest(orderInfo);
+        swap.addSwapRequest(orderInfo, false, false);
         rebalanceRequests.push(Request({
             nonce: rebalanceRequests.length,
             requester: msg.sender,

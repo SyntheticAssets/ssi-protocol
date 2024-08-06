@@ -50,6 +50,9 @@ struct SwapRequest {
     bytes32[] outTxHashs;
     SwapRequestStatus status;
     address requester;
+    bool inByContract;
+    bool outByContract;
+    uint256 blocknumber;
 }
 
 enum RequestStatus {NONE, PENDING, CONFIRMED, REJECTED}
@@ -121,7 +124,7 @@ interface ISwap is IAccessControl {
     function getOrderHashLength() external view returns (uint256);
     function getOrderHash(uint256 idx) external view returns (bytes32);
     function getSwapRequest(bytes32 orderHash) external view returns (SwapRequest memory);
-    function addSwapRequest(OrderInfo memory orderInfo) external;
+    function addSwapRequest(OrderInfo memory orderInfo, bool inByContract, bool outByContract) external;
     function makerConfirmSwapRequest(OrderInfo memory orderInfo, bytes32[] memory outTxHashs) external;
     function makerRejectSwapRequest(OrderInfo memory orderInfo) external;
     function rollbackSwapRequest(OrderInfo memory orderInfo) external;

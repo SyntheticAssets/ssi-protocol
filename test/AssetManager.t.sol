@@ -16,7 +16,7 @@ contract FundManagerTest is Test {
     MockToken WETH = new MockToken("Wrapped ETH", "WETH", 18);
 
     address owner = vm.addr(0x1);
-    address vault = vm.addr(0x2);
+    address vault = vm.parseAddress("0xc9b6174bDF1deE9Ba42Af97855Da322b91755E63");
     address pmm = vm.addr(0x3);
     address ap = vm.addr(0x4);
     Swap swap;
@@ -27,7 +27,7 @@ contract FundManagerTest is Test {
 
     function setUp() public {
         vm.startPrank(owner);
-        swap = new Swap(owner);
+        swap = new Swap(owner, "SETH");
         factory = new AssetFactory(owner, address(swap), vault, "SETH");
         issuer = new AssetIssuer(owner, address(factory));
         rebalancer = new AssetRebalancer(owner, address(factory));
@@ -36,6 +36,10 @@ contract FundManagerTest is Test {
         swap.grantRole(swap.TAKER_ROLE(), address(issuer));
         swap.grantRole(swap.TAKER_ROLE(), address(rebalancer));
         swap.grantRole(swap.TAKER_ROLE(), address(feeManager));
+        string[] memory outWhiteAddresses = new string[](2);
+        outWhiteAddresses[0] = vm.toString(address(issuer));
+        outWhiteAddresses[1] = vm.toString(vault);
+        swap.setTakerAddresses(outWhiteAddresses, outWhiteAddresses);
         vm.stopPrank();
     }
 
@@ -122,22 +126,31 @@ contract FundManagerTest is Test {
         return (nonce, amountBeforeMint);
     }
 
-    function pmmConfirmSwapRequest(OrderInfo memory orderInfo) public {
+    function pmmConfirmSwapRequest(OrderInfo memory orderInfo, bool byContract) public {
         vm.startPrank(pmm);
         uint transferAmount = orderInfo.order.outTokenset[0].amount * orderInfo.order.outAmount / 10**8;
         MockToken token = MockToken(vm.parseAddress(orderInfo.order.outTokenset[0].addr));
         token.mint(pmm, transferAmount);
-        token.transfer(vm.parseAddress(orderInfo.order.outAddressList[0]), transferAmount);
-        bytes32[] memory outTxHashs = new bytes32[](1);
-        outTxHashs[0] = 'outTxHashs';
-        swap.makerConfirmSwapRequest(orderInfo, outTxHashs);
+        if (!byContract) {
+            token.transfer(vm.parseAddress(orderInfo.order.outAddressList[0]), transferAmount);
+            bytes32[] memory outTxHashs = new bytes32[](1);
+            outTxHashs[0] = 'outTxHashs';
+            swap.makerConfirmSwapRequest(orderInfo, outTxHashs);
+        } else {
+            token.approve(address(swap), transferAmount);
+            bytes32[] memory outTxHashs = new bytes32[](0);
+            swap.makerConfirmSwapRequest(orderInfo, outTxHashs);
+        }
+        
     }
 
-    function vaultConfirmSwap(OrderInfo memory orderInfo, uint256 beforeAmount) public {
+    function vaultConfirmSwap(OrderInfo memory orderInfo, uint256 beforeAmount, bool check) public {
         vm.startPrank(vault);
-        uint outAmount = orderInfo.order.outTokenset[0].amount * orderInfo.order.outAmount / 10**8;
-        MockToken outToken = MockToken(vm.parseAddress(orderInfo.order.outTokenset[0].addr));
-        vm.assertEq(outToken.balanceOf(vault), outAmount + beforeAmount);
+        if (check) {
+            uint outAmount = orderInfo.order.outTokenset[0].amount * orderInfo.order.outAmount / 10**8;
+            MockToken outToken = MockToken(vm.parseAddress(orderInfo.order.outTokenset[0].addr));
+            vm.assertEq(outToken.balanceOf(vault), outAmount + beforeAmount);
+        }
         uint inAmount = orderInfo.order.inTokenset[0].amount * orderInfo.order.inAmount / 10**8;
         MockToken inToken = MockToken(vm.parseAddress(orderInfo.order.inTokenset[0].addr));
         inToken.transfer(pmm, inAmount);
@@ -162,6 +175,7 @@ contract FundManagerTest is Test {
             decimals: WETH.decimals(),
             amount: 10 ** WETH.decimals()
         });
+        WETH.approve(address(swap), 10**WETH.decimals());
         Order memory order = Order({
             maker: pmm,
             nonce: 1,
@@ -174,7 +188,7 @@ contract FundManagerTest is Test {
             deadline: vm.getBlockTimestamp() + 60
         });
         order.inAddressList[0] = vm.toString(pmm);
-        order.outAddressList[0] = vm.toString(vault);
+        order.outAddressList[0] = vm.toString(address(issuer));
         bytes32 orderHash = keccak256(abi.encode(order));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x3, orderHash);
         bytes memory orderSign = abi.encodePacked(r, s, v);
@@ -349,9 +363,9 @@ contract FundManagerTest is Test {
         address assetTokenAddress = createAssetToken();
         OrderInfo memory orderInfo = pmmQuoteMint();
         (uint nonce, ) = apAddMintRequest(assetTokenAddress, orderInfo);
-        uint256 beforeAmount = IERC20(vm.parseAddress(orderInfo.order.outTokenset[0].addr)).balanceOf(vault);
-        pmmConfirmSwapRequest(orderInfo);
-        vaultConfirmSwap(orderInfo, beforeAmount);
+        // uint256 beforeAmount = IERC20(vm.parseAddress(orderInfo.order.outTokenset[0].addr)).balanceOf(vault);
+        pmmConfirmSwapRequest(orderInfo, false);
+        // vaultConfirmSwap(orderInfo, beforeAmount);
         confirmMintRequest(nonce, orderInfo);
         assertEq(IERC20(assetTokenAddress).balanceOf(ap), orderInfo.order.outAmount);
         assertEq(AssetToken(assetTokenAddress).getBasket()[0].amount, orderInfo.order.outTokenset[0].amount * orderInfo.order.outAmount / 10 ** 8);
@@ -363,9 +377,10 @@ contract FundManagerTest is Test {
         OrderInfo memory orderInfo = pmmQuoteRedeem();
         (uint nonce, ) = apAddRedeemRequest(assetTokenAddress, orderInfo);
         uint256 beforeAmount = IERC20(vm.parseAddress(orderInfo.order.outTokenset[0].addr)).balanceOf(vault);
-        pmmConfirmSwapRequest(orderInfo);
-        vaultConfirmSwap(orderInfo, beforeAmount);
-        address outTokenAddress = vaultTransferToIssuer(orderInfo);
+        pmmConfirmSwapRequest(orderInfo, true);
+        vaultConfirmSwap(orderInfo, beforeAmount, false);
+        // address outTokenAddress = vaultTransferToIssuer(orderInfo);
+        address outTokenAddress = vm.parseAddress(orderInfo.order.outTokenset[0].addr);
         confirmRedeemRequest(nonce, orderInfo);
         MockToken outToken = MockToken(outTokenAddress);
         assertEq(IERC20(assetTokenAddress).balanceOf(ap), 0);
@@ -381,8 +396,8 @@ contract FundManagerTest is Test {
         OrderInfo memory orderInfo = pmmQuoteBurn(assetTokenAddress);
         uint nonce = addBurnFeeRequest(assetTokenAddress, orderInfo);
         uint256 beforeAmount = IERC20(vm.parseAddress(orderInfo.order.outTokenset[0].addr)).balanceOf(vault);
-        pmmConfirmSwapRequest(orderInfo);
-        vaultConfirmSwap(orderInfo, beforeAmount);
+        pmmConfirmSwapRequest(orderInfo, true);
+        vaultConfirmSwap(orderInfo, beforeAmount, false);
         confirmBurnFeeRequest(nonce, orderInfo);
         assertEq(assetToken.getFeeTokenset().length, 0);
         assertEq(IERC20(vm.parseAddress(orderInfo.order.outTokenset[0].addr)).balanceOf(vault),
@@ -395,8 +410,8 @@ contract FundManagerTest is Test {
         OrderInfo memory orderInfo = pmmQuoteRebalance(assetTokenAddress);
         uint nonce = addRebalanceRequest(assetTokenAddress, orderInfo);
         uint256 beforeAmount = IERC20(vm.parseAddress(orderInfo.order.outTokenset[0].addr)).balanceOf(vault);
-        pmmConfirmSwapRequest(orderInfo);
-        vaultConfirmSwap(orderInfo, beforeAmount);
+        pmmConfirmSwapRequest(orderInfo, false);
+        vaultConfirmSwap(orderInfo, beforeAmount, true);
         confirmRebalanceRequest(nonce, orderInfo);
         assertEq(assetToken.getBasket()[0].symbol, orderInfo.order.outTokenset[0].symbol);
         assertEq(assetToken.getBasket()[0].amount, orderInfo.order.outTokenset[0].amount * orderInfo.order.outAmount / 10**8);
@@ -430,11 +445,11 @@ contract FundManagerTest is Test {
         vm.startPrank(pmm);
         swap.makerRejectSwapRequest(orderInfo);
         vm.stopPrank();
-        vm.startPrank(vault);
-        uint tokenAmount = orderInfo.order.inTokenset[0].amount * orderInfo.order.inAmount / 10**8;
-        uint feeAmount = tokenAmount * 10000 / 10**8;
-        inToken.transfer(address(issuer), tokenAmount + feeAmount);
-        vm.stopPrank();
+        // vm.startPrank(vault);
+        // uint tokenAmount = orderInfo.order.inTokenset[0].amount * orderInfo.order.inAmount / 10**8;
+        // uint feeAmount = tokenAmount * 10000 / 10**8;
+        // inToken.transfer(address(issuer), tokenAmount + feeAmount);
+        // vm.stopPrank();
         vm.startPrank(owner);
         issuer.rejectMintRequest(nonce, orderInfo);
         assertEq(inToken.balanceOf(ap), amountBeforeMint);
@@ -629,7 +644,6 @@ contract FundManagerTest is Test {
         });
         vm.startPrank(owner);
         swap.grantRole(swap.MAKER_ROLE(), 0xd1d1aDfD330B29D4ccF9E0d44E90c256Df597dc9);
-        console.log(swap.checkOrderInfo(orderInfo));
         rebalancer.addRebalanceRequest(assetToken.id(), assetToken.getBasket(), orderInfo);
         vm.stopPrank();
     }
@@ -651,7 +665,50 @@ contract FundManagerTest is Test {
     function test_Swap() public {
         OrderInfo memory orderInfo = pmmQuoteMint();
         vm.startPrank(address(issuer));
-        swap.addSwapRequest(orderInfo);
+        swap.addSwapRequest(orderInfo, false, false);
         vm.stopPrank();
+    }
+
+    function test_rollback() public {
+        address assetTokenAddress = createAssetToken();
+        OrderInfo memory orderInfo = pmmQuoteMint();
+        apAddMintRequest(assetTokenAddress, orderInfo);
+        vm.startPrank(pmm);
+        bytes32[] memory outTxHashs = new bytes32[](1);
+        outTxHashs[0] = "outTxhash";
+        swap.makerConfirmSwapRequest(orderInfo, outTxHashs);
+        vm.stopPrank();
+        vm.startPrank(owner);
+        issuer.rollbackSwapRequest(orderInfo);
+        vm.stopPrank();
+        SwapRequest memory swapRequest = swap.getSwapRequest(orderInfo.orderHash);
+        assertTrue(swapRequest.status == SwapRequestStatus.PENDING);
+    }
+
+    function test_withdraw() public {
+        WETH.mint(owner, 10**18);
+        vm.startPrank(owner);
+        WETH.transfer(address(issuer), 10**18);
+        address[] memory tokenAddresses = new address[](2);
+        tokenAddresses[0] = address(WETH);
+        tokenAddresses[1] = address(0);
+        issuer.withdraw(tokenAddresses);
+        assertEq(WETH.balanceOf(owner), 10**18);
+        vm.stopPrank();
+        address assetTokenAddress = createAssetToken();
+        OrderInfo memory orderInfo = pmmQuoteMint();
+        (uint nonce,) = apAddMintRequest(assetTokenAddress, orderInfo);
+        vm.startPrank(owner);
+        WETH.transfer(address(issuer), 10**18);
+        vm.expectRevert();
+        issuer.withdraw(tokenAddresses);
+        vm.stopPrank();
+        vm.startPrank(pmm);
+        swap.makerRejectSwapRequest(orderInfo);
+        vm.stopPrank();
+        vm.startPrank(owner);
+        issuer.rejectMintRequest(nonce, orderInfo);
+        issuer.withdraw(tokenAddresses);
+        assertEq(WETH.balanceOf(owner), 10**18);
     }
 }

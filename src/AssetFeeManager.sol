@@ -58,7 +58,7 @@ contract AssetFeeManager is AssetController, IAssetFeeManager {
             require(Utils.stringToAddress(orderInfo.order.outAddressList[i]) == factory.vault(), "fee receiver not match");
             require(bytes32(bytes(orderInfo.order.outTokenset[i].chain)) == bytes32(bytes(factory.chain())), "outTokenset chain not match");
         }
-        swap.addSwapRequest(orderInfo);
+        swap.addSwapRequest(orderInfo, false, true);
         burnFeeRequests.push(Request({
             nonce: burnFeeRequests.length,
             requester: msg.sender,

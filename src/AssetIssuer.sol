@@ -99,7 +99,6 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         address assetTokenAddress = factory.assetTokens(assetID);
         IAssetToken assetToken = IAssetToken(assetTokenAddress);
         address swapAddress = factory.swap();
-        address vault = factory.vault();
         ISwap swap = ISwap(swapAddress);
         require(assetToken.feeCollected(), "has fee not collect");
         require(assetToken.rebalancing() == false, "is rebalancing");
@@ -118,9 +117,12 @@ contract AssetIssuer is AssetController, IAssetIssuer {
             uint transferAmount = inTokenAmount + feeTokenAmount;
             require(inToken.balanceOf(msg.sender) >= transferAmount, "not enough balance");
             require(inToken.allowance(msg.sender, address(this)) >= transferAmount, "not enough allowance");
-            inToken.safeTransferFrom(msg.sender, vault, transferAmount);
+            if (inToken.allowance(address(this), swapAddress) < inTokenAmount) {
+                inToken.approve(swapAddress, type(uint256).max);
+            }
+            inToken.safeTransferFrom(msg.sender, address(this), transferAmount);
         }
-        swap.addSwapRequest(orderInfo);
+        swap.addSwapRequest(orderInfo, true, false);
         mintRequests.push(Request({
             nonce: mintRequests.length,
             requester: msg.sender,
@@ -173,6 +175,20 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         SwapRequest memory swapRequest = swap.getSwapRequest(mintRequest.orderHash);
         require(swapRequest.status == SwapRequestStatus.MAKER_CONFIRMED);
         swap.confirmSwapRequest(orderInfo, inTxHashs);
+        Token[] memory inTokenset = orderInfo.order.inTokenset;
+        IAssetFactory factory = IAssetFactory(factoryAddress);
+        address vault = factory.vault();
+        string memory chain = factory.chain();
+        Order memory order = orderInfo.order;
+        for (uint i = 0; i < inTokenset.length; i++) {
+            require(bytes32(bytes(inTokenset[i].chain)) == bytes32(bytes(chain)), "chain not match");
+            address tokenAddress = Utils.stringToAddress(inTokenset[i].addr);
+            IERC20 inToken = IERC20(tokenAddress);
+            uint inTokenAmount = inTokenset[i].amount * order.inAmount / 10**8;
+            uint feeTokenAmount = inTokenAmount * mintRequest.issueFee / 10**feeDecimals;
+            require(inToken.balanceOf(address(this)) >= feeTokenAmount, "not enough balance");
+            inToken.safeTransfer(vault, feeTokenAmount);
+        }
         IAssetToken assetToken = IAssetToken(mintRequest.assetTokenAddress);
         assetToken.mint(mintRequest.requester, mintRequest.amount);
         mintRequests[nonce].status = RequestStatus.CONFIRMED;
@@ -212,9 +228,10 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         Token[] memory outTokenset = order.outTokenset;
         for (uint i = 0; i < outTokenset.length; i++) {
             require(bytes32(bytes(outTokenset[i].chain)) == bytes32(bytes(factory.chain())), "chain not match");
+            require(Utils.stringToAddress(order.outAddressList[i]) == address(this), "out address not valid");
         }
         assetToken.safeTransferFrom(msg.sender, address(this), order.inAmount);
-        swap.addSwapRequest(orderInfo);
+        swap.addSwapRequest(orderInfo, false, true);
         redeemRequests.push(Request({
             nonce: redeemRequests.length,
             requester: msg.sender,
@@ -259,14 +276,16 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         require(assetToken.balanceOf(address(this)) >= redeemRequest.amount, "not enough asset token to burn");
         Order memory order = orderInfo.order;
         Token[] memory outTokenset = order.outTokenset;
+        address vault = IAssetFactory(factoryAddress).vault();
         for (uint i = 0; i < outTokenset.length; i++) {
             address tokenAddress = Utils.stringToAddress(outTokenset[i].addr);
             IERC20 outToken = IERC20(tokenAddress);
             uint outTokenAmount = outTokenset[i].amount * order.outAmount / 10**8;
             uint feeTokenAmount = outTokenAmount * redeemRequest.issueFee / 10**feeDecimals;
             uint transferAmount = outTokenAmount - feeTokenAmount;
-            require(outToken.balanceOf(address(this)) >= transferAmount, "not enough balance");
+            require(outToken.balanceOf(address(this)) >= outTokenAmount, "not enough balance");
             outToken.safeTransfer(redeemRequest.requester, transferAmount);
+            outToken.safeTransfer(vault, feeTokenAmount);
         }
         assetToken.burn(redeemRequest.amount);
         redeemRequests[nonce].status = RequestStatus.CONFIRMED;
@@ -304,6 +323,21 @@ contract AssetIssuer is AssetController, IAssetIssuer {
     function removeParticipant(uint256 assetID, address participant) external onlyOwner {
         if (_participants[assetID].remove(participant)) {
             emit RemoveParticipant(assetID, participant);
+        }
+    }
+
+    function withdraw(address[] memory tokenAddresses) external onlyOwner {
+        IAssetFactory facotry = IAssetFactory(factoryAddress);
+        uint256[] memory assetIDs = facotry.getAssetIDs();
+        for (uint i = 0; i < assetIDs.length; i++) {
+            IAssetToken assetToken = IAssetToken(facotry.assetTokens(assetIDs[i]));
+            require(!assetToken.issuing(), "is issuing");
+        }
+        for (uint i = 0; i < tokenAddresses.length; i++) {
+            if (tokenAddresses[i] != address(0)) {
+                IERC20 token = IERC20(tokenAddresses[i]);
+                token.safeTransfer(owner(), token.balanceOf(address(this)));
+            }
         }
     }
 }

@@ -14,4 +14,8 @@ contract AssetController is Ownable, IAssetController {
         require(request.orderHash == orderInfo.orderHash, "order hash not match");
         require(orderInfo.orderHash == keccak256(abi.encode(orderInfo.order)), "order hash invalid");
     }
+
+    function rollbackSwapRequest(OrderInfo memory orderInfo) external onlyOwner {
+        ISwap(IAssetFactory(factoryAddress).swap()).rollbackSwapRequest(orderInfo);
+    }
 }
