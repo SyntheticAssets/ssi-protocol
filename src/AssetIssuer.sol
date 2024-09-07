@@ -118,7 +118,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
             require(inToken.balanceOf(msg.sender) >= transferAmount, "not enough balance");
             require(inToken.allowance(msg.sender, address(this)) >= transferAmount, "not enough allowance");
             if (inToken.allowance(address(this), swapAddress) < inTokenAmount) {
-                inToken.approve(swapAddress, type(uint256).max);
+                inToken.forceApprove(swapAddress, type(uint256).max);
             }
             inToken.safeTransferFrom(msg.sender, address(this), transferAmount);
         }
