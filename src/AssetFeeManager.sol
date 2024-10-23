@@ -88,7 +88,7 @@ contract AssetFeeManager is AssetController, IAssetFeeManager {
         emit RejectBurnFeeRequest(nonce);
     }
 
-    function confirmBurnFeeRequest(uint nonce, OrderInfo memory orderInfo, bytes32[] memory inTxHashs) external onlyOwner {
+    function confirmBurnFeeRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external onlyOwner {
         require(nonce < burnFeeRequests.length);
         Request memory burnFeeRequest = burnFeeRequests[nonce];
         checkRequestOrderInfo(burnFeeRequest, orderInfo);

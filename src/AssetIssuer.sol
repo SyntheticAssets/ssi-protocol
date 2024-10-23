@@ -166,7 +166,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         emit RejectMintRequest(nonce);
     }
 
-    function confirmMintRequest(uint nonce, OrderInfo memory orderInfo, bytes32[] memory inTxHashs) external onlyOwner {
+    function confirmMintRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external onlyOwner {
         require(nonce < mintRequests.length);
         Request memory mintRequest = mintRequests[nonce];
         checkRequestOrderInfo(mintRequest, orderInfo);
@@ -263,7 +263,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         emit RejectRedeemRequest(nonce);
     }
 
-    function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo, bytes32[] memory inTxHashs) external onlyOwner {
+    function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external onlyOwner {
         require(nonce < redeemRequests.length);
         Request memory redeemRequest = redeemRequests[nonce];
         checkRequestOrderInfo(redeemRequest, orderInfo);

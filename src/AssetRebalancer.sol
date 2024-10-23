@@ -79,7 +79,7 @@ contract AssetRebalancer is AssetController, IAssetRebalancer {
         emit RejectRebalanceRequest(nonce);
     }
 
-    function confirmRebalanceRequest(uint nonce, OrderInfo memory orderInfo, bytes32[] memory inTxHashs) external onlyOwner {
+    function confirmRebalanceRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external onlyOwner {
         require(nonce < rebalanceRequests.length);
         Request memory rebalanceRequest = rebalanceRequests[nonce];
         checkRequestOrderInfo(rebalanceRequest, orderInfo);
