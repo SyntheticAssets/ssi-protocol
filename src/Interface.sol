@@ -46,8 +46,8 @@ struct Range {
 enum SwapRequestStatus {NONE, PENDING, MAKER_CONFIRMED, CONFIRMED, REJECTED}
 
 struct SwapRequest {
-    bytes32[] inTxHashs;
-    bytes32[] outTxHashs;
+    bytes[] inTxHashs;
+    bytes[] outTxHashs;
     SwapRequestStatus status;
     address requester;
     bool inByContract;
@@ -125,10 +125,10 @@ interface ISwap is IAccessControl {
     function getOrderHash(uint256 idx) external view returns (bytes32);
     function getSwapRequest(bytes32 orderHash) external view returns (SwapRequest memory);
     function addSwapRequest(OrderInfo memory orderInfo, bool inByContract, bool outByContract) external;
-    function makerConfirmSwapRequest(OrderInfo memory orderInfo, bytes32[] memory outTxHashs) external;
+    function makerConfirmSwapRequest(OrderInfo memory orderInfo, bytes[] memory outTxHashs) external;
     function makerRejectSwapRequest(OrderInfo memory orderInfo) external;
     function rollbackSwapRequest(OrderInfo memory orderInfo) external;
-    function confirmSwapRequest(OrderInfo memory orderInfo, bytes32[] memory inTxHashs) external;
+    function confirmSwapRequest(OrderInfo memory orderInfo, bytes[] memory inTxHashs) external;
     function setTakerAddresses(string[] memory takerReceivers_, string[] memory takerSenders_) external;
     function getTakerAddresses() external view returns (string[] memory receivers, string[] memory senders);
 }
@@ -143,13 +143,13 @@ interface IAssetIssuer is IAssetController {
     function getMintRequest(uint256 nonce) external view returns (Request memory);
     function addMintRequest(uint256 assetID, OrderInfo memory orderInfo) external returns (uint);
     function rejectMintRequest(uint256 nonce, OrderInfo memory orderInfo) external;
-    function confirmMintRequest(uint nonce, OrderInfo memory orderInfo, bytes32[] memory inTxHashs) external;
+    function confirmMintRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external;
     // redeem
     function getRedeemRequestLength() external view returns (uint256);
     function getRedeemRequest(uint256 nonce) external view returns (Request memory);
     function addRedeemRequest(uint256 assetID, OrderInfo memory orderInfo) external returns (uint256);
     function rejectRedeemRequest(uint256 nonce) external;
-    function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo, bytes32[] memory inTxHashs) external;
+    function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external;
     // manage participants
     function isParticipant(uint256 assetID, address participant) external view returns (bool);
     function getParticipants(uint256 assetID) external view returns (address[] memory);
@@ -171,7 +171,7 @@ interface IAssetRebalancer is IAssetController {
     function getRebalanceRequest(uint256 nonce) external view returns (Request memory);
     function addRebalanceRequest(uint256 assetID, Token[] memory basket, OrderInfo memory orderInfo) external returns (uint256);
     function rejectRebalanceRequest(uint256 nonce) external;
-    function confirmRebalanceRequest(uint nonce, OrderInfo memory orderInfo, bytes32[] memory inTxHashs) external;
+    function confirmRebalanceRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external;
 }
 
 interface IAssetFeeManager is IAssetController {
@@ -181,5 +181,5 @@ interface IAssetFeeManager is IAssetController {
     function getBurnFeeRequest(uint256 nonce) external view returns (Request memory);
     function addBurnFeeRequest(uint256 assetID, OrderInfo memory orderInfo) external returns (uint256);
     function rejectBurnFeeRequest(uint256 nonce) external;
-    function confirmBurnFeeRequest(uint nonce, OrderInfo memory orderInfo, bytes32[] memory inTxHashs) external;
+    function confirmBurnFeeRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external;
 }

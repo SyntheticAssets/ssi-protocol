@@ -138,7 +138,7 @@ contract Swap is AccessControl, ISwap {
         }
     }
 
-    function makerConfirmSwapRequest(OrderInfo memory orderInfo, bytes32[] memory outTxHashs) external onlyRole(MAKER_ROLE) {
+    function makerConfirmSwapRequest(OrderInfo memory orderInfo, bytes[] memory outTxHashs) external onlyRole(MAKER_ROLE) {
         validateOrderInfo(orderInfo);
         bytes32 orderHash = orderInfo.orderHash;
         SwapRequest memory swapRequest = swapRequests[orderHash];
@@ -166,7 +166,7 @@ contract Swap is AccessControl, ISwap {
         emit RollbackSwapRequest(msg.sender, orderHash);
     }
 
-    function confirmSwapRequest(OrderInfo memory orderInfo, bytes32[] memory inTxHashs) external onlyRole(TAKER_ROLE) {
+    function confirmSwapRequest(OrderInfo memory orderInfo, bytes[] memory inTxHashs) external onlyRole(TAKER_ROLE) {
         validateOrderInfo(orderInfo);
         bytes32 orderHash = orderInfo.orderHash;
         SwapRequest memory swapRequest = swapRequests[orderHash];

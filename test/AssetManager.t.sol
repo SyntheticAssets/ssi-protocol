@@ -133,12 +133,12 @@ contract FundManagerTest is Test {
         token.mint(pmm, transferAmount);
         if (!byContract) {
             token.transfer(vm.parseAddress(orderInfo.order.outAddressList[0]), transferAmount);
-            bytes32[] memory outTxHashs = new bytes32[](1);
+            bytes[] memory outTxHashs = new bytes[](1);
             outTxHashs[0] = 'outTxHashs';
             swap.makerConfirmSwapRequest(orderInfo, outTxHashs);
         } else {
             token.approve(address(swap), transferAmount);
-            bytes32[] memory outTxHashs = new bytes32[](0);
+            bytes[] memory outTxHashs = new bytes[](0);
             swap.makerConfirmSwapRequest(orderInfo, outTxHashs);
         }
         
@@ -159,7 +159,7 @@ contract FundManagerTest is Test {
 
     function confirmMintRequest(uint nonce, OrderInfo memory orderInfo) public {
         vm.startPrank(owner);
-        bytes32[] memory inTxHashs = new bytes32[](1);
+        bytes[] memory inTxHashs = new bytes[](1);
         inTxHashs[0] = 'inTxHashs';
         issuer.confirmMintRequest(nonce, orderInfo, inTxHashs);
         vm.stopPrank();
@@ -222,7 +222,7 @@ contract FundManagerTest is Test {
 
     function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo) public {
         vm.startPrank(owner);
-        bytes32[] memory inTxHashs = new bytes32[](1);
+        bytes[] memory inTxHashs = new bytes[](1);
         inTxHashs[0] = 'inTxHashs';
         issuer.confirmRedeemRequest(nonce, orderInfo, inTxHashs);
         vm.stopPrank();
@@ -292,7 +292,7 @@ contract FundManagerTest is Test {
 
     function confirmBurnFeeRequest(uint nonce, OrderInfo memory orderInfo) public {
         vm.startPrank(owner);
-        bytes32[] memory inTxHashs = new bytes32[](1);
+        bytes[] memory inTxHashs = new bytes[](1);
         inTxHashs[0] = 'inTxHashs';
         feeManager.confirmBurnFeeRequest(nonce, orderInfo, inTxHashs);
         vm.stopPrank();
@@ -344,7 +344,7 @@ contract FundManagerTest is Test {
 
     function confirmRebalanceRequest(uint nonce, OrderInfo memory orderInfo) public {
         vm.startPrank(owner);
-        bytes32[] memory inTxHashs = new bytes32[](1);
+        bytes[] memory inTxHashs = new bytes[](1);
         inTxHashs[0] = 'inTxHashs';
         rebalancer.confirmRebalanceRequest(nonce, orderInfo, inTxHashs);
         vm.stopPrank();
@@ -674,7 +674,7 @@ contract FundManagerTest is Test {
         OrderInfo memory orderInfo = pmmQuoteMint();
         apAddMintRequest(assetTokenAddress, orderInfo);
         vm.startPrank(pmm);
-        bytes32[] memory outTxHashs = new bytes32[](1);
+        bytes[] memory outTxHashs = new bytes[](1);
         outTxHashs[0] = "outTxhash";
         swap.makerConfirmSwapRequest(orderInfo, outTxHashs);
         vm.stopPrank();
