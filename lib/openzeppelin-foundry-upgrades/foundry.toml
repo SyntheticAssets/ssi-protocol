@@ -9,16 +9,16 @@ extra_output = ["storageLayout"]
 src = "test-profiles/openzeppelin-contracts-v4/src"
 test = "test-profiles/openzeppelin-contracts-v4/test"
 remappings = [
-  "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts-v4",
-  "@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable-v4"
+"@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
+  "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/"
 ]
 
 [profile.openzeppelin-contracts-v4-with-v5-proxies]
 src = "test-profiles/openzeppelin-contracts-v4-with-v5-proxies/src"
 test = "test-profiles/openzeppelin-contracts-v4-with-v5-proxies/test"
 remappings = [
-  "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts",
-  "@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable-v4"
+"@openzeppelin/contracts/=lib/openzeppelin-contracts-upgradeable/lib/openzeppelin-contracts/contracts/",
+  "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/"
 ]
 
 [profile.build-info-v1]
