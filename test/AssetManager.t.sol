@@ -711,4 +711,17 @@ contract FundManagerTest is Test {
         issuer.withdraw(tokenAddresses);
         assertEq(WETH.balanceOf(owner), 10**18);
     }
+
+    function test_BurnFor() public {
+        address tokenAddress = test_Mint();
+        IAssetToken token = IAssetToken(tokenAddress);
+        vm.startPrank(ap);
+        token.approve(address(issuer), token.balanceOf(ap));
+        issuer.burnFor(token.id(), token.balanceOf(ap));
+        vm.stopPrank();
+        assertEq(token.balanceOf(ap), 0);
+        assertEq(token.balanceOf(address(issuer)), 0);
+        Token[] memory tokens = token.getBasket();
+        assertEq(tokens.length, 0);
+    }
 }

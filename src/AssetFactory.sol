@@ -12,6 +12,11 @@ contract AssetFactory is Ownable, IAssetFactory {
     using EnumerableSet for EnumerableSet.UintSet;
     EnumerableSet.UintSet assetIDs;
     mapping(uint => address) public assetTokens;
+
+    mapping(uint => address) public issuers;
+    mapping(uint => address) public rebalancers;
+    mapping(uint => address) public feeManagers;
+
     address public swap;
     address public vault;
     string public chain;
@@ -57,6 +62,9 @@ contract AssetFactory is Ownable, IAssetFactory {
         assetToken.grantRole(assetToken.FEEMANAGER_ROLE(), feeManager);
         assetToken.initTokenset(asset.tokenset);
         assetTokens[asset.id] = address(assetToken);
+        issuers[asset.id] = issuer;
+        rebalancers[asset.id] = rebalancer;
+        feeManagers[asset.id] = feeManager;
         assetIDs.add(asset.id);
         emit AssetTokenCreated(address(assetToken));
         return address(assetToken);

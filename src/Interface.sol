@@ -116,6 +116,9 @@ interface IAssetFactory {
     function assetTokens(uint assetID) external view returns (address);
     function hasAssetID(uint assetID) external view returns (bool);
     function getAssetIDs() external view returns (uint[] memory);
+    function issuers(uint assetID) external view returns (address);
+    function rebalancers(uint assetID) external view returns (address);
+    function feeManagers(uint assetID) external view returns (address);
 }
 
 interface ISwap is IAccessControl {
@@ -164,6 +167,8 @@ interface IAssetIssuer is IAssetController {
     // issue amount range
     function getIssueAmountRange(uint256 assetID) external view returns (Range memory);
     function setIssueAmountRange(uint256 assetID, Range calldata issueAmountRange) external;
+    // burn for
+    function burnFor(uint256 assetID, uint256 amount) external;
 }
 
 interface IAssetRebalancer is IAssetController {

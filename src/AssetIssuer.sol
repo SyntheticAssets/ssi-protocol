@@ -327,10 +327,10 @@ contract AssetIssuer is AssetController, IAssetIssuer {
     }
 
     function withdraw(address[] memory tokenAddresses) external onlyOwner {
-        IAssetFactory facotry = IAssetFactory(factoryAddress);
-        uint256[] memory assetIDs = facotry.getAssetIDs();
+        IAssetFactory factory = IAssetFactory(factoryAddress);
+        uint256[] memory assetIDs = factory.getAssetIDs();
         for (uint i = 0; i < assetIDs.length; i++) {
-            IAssetToken assetToken = IAssetToken(facotry.assetTokens(assetIDs[i]));
+            IAssetToken assetToken = IAssetToken(factory.assetTokens(assetIDs[i]));
             require(!assetToken.issuing(), "is issuing");
         }
         for (uint i = 0; i < tokenAddresses.length; i++) {
@@ -339,5 +339,16 @@ contract AssetIssuer is AssetController, IAssetIssuer {
                 token.safeTransfer(owner(), token.balanceOf(address(this)));
             }
         }
+    }
+
+    function burnFor(uint256 assetID, uint256 amount) external {
+        require(!paused, "paused");
+        IAssetFactory factory = IAssetFactory(factoryAddress);
+        IAssetToken assetToken = IAssetToken(factory.assetTokens(assetID));
+        require(assetToken.allowance(msg.sender, address(this)) >= amount, "not enough allowance");
+        assetToken.lockIssue();
+        assetToken.safeTransferFrom(msg.sender, address(this), amount);
+        assetToken.burn(amount);
+        assetToken.unlockIssue();
     }
 }
