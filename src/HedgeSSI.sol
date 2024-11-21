@@ -179,4 +179,12 @@ contract HedgeSSI is Ownable, ERC20 {
             orderHashs_[i] = orderHashs.at(i);
         }
     }
+
+    function getOrderHashLength() external view returns (uint256) {
+        return orderHashs.length();
+    }
+
+    function getOrderHash(uint256 nonce) external view returns (bytes32) {
+        return orderHashs.at(nonce);
+    }
 }
