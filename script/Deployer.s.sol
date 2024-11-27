@@ -8,8 +8,9 @@ import {AssetIssuer} from "../src/AssetIssuer.sol";
 import {AssetRebalancer} from "../src/AssetRebalancer.sol";
 import {AssetFeeManager} from "../src/AssetFeeManager.sol";
 import {StakeFactory} from "../src/StakeFactory.sol";
-import {AssetStaking} from "../src/AssetStaking.sol";
-import {HedgeSSI} from "../src/HedgeSSI.sol";
+import {StakeToken} from "../src/StakeToken.sol";
+import {AssetLocking} from "../src/AssetLocking.sol";
+import {USSI} from "../src/USSI.sol";
 
 contract DeployerScript is Script {
     function setUp() public {}
@@ -27,8 +28,9 @@ contract DeployerScript is Script {
         AssetRebalancer rebalancer = new AssetRebalancer(owner, address(factory));
         AssetFeeManager feeManager = new AssetFeeManager(owner, address(factory));
         StakeFactory stakeFactory = new StakeFactory(owner, address(factory));
-        AssetStaking assetStaking = new AssetStaking(owner);
-        HedgeSSI hedgeSSI = new HedgeSSI(owner, orderSigner, address(factory), redeemToken);
+        AssetLocking assetLocking = new AssetLocking(owner);
+        USSI uSSI = new USSI(owner, orderSigner, address(factory), redeemToken);
+        StakeToken sUSSI = new StakeToken("Staked USSI", "sUSSI", address(uSSI), 7 days);
         vm.stopBroadcast();
         console.log(string.concat("swap=", vm.toString(address(swap))));
         console.log(string.concat("factory=", vm.toString(address(factory))));
@@ -36,7 +38,8 @@ contract DeployerScript is Script {
         console.log(string.concat("rebalancer=", vm.toString(address(rebalancer))));
         console.log(string.concat("feeManager=", vm.toString(address(feeManager))));
         console.log(string.concat("stakeFactory=", vm.toString(address(stakeFactory))));
-        console.log(string.concat("assetStaking=", vm.toString(address(assetStaking))));
-        console.log(string.concat("hedgeSSI=", vm.toString(address(hedgeSSI))));
+        console.log(string.concat("assetLocking=", vm.toString(address(assetLocking))));
+        console.log(string.concat("USSI=", vm.toString(address(uSSI))));
+        console.log(string.concat("sUSSI=", vm.toString(address(sUSSI))));
     }
 }

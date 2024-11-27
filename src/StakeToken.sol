@@ -12,13 +12,16 @@ contract StakeToken is ERC20 {
     uint48 public cooldown;
     uint48 public constant MAX_COOLDOWN = 30 days;
 
-    struct StakeInfo {
-        uint256 amount;
+    struct CooldownInfo {
         uint256 cooldownAmount;
         uint256 cooldownEndTimestamp;
     }
 
-    mapping(address => StakeInfo) public stakeInfos;
+    mapping(address => CooldownInfo) public cooldownInfos;
+
+    event Stake(address staker, uint256 amount);
+    event UnStake(address unstaker, uint256 amount);
+    event Withdraw(address withdrawer, uint256 amount);
 
     constructor(
         string memory name_,
@@ -37,27 +40,27 @@ contract StakeToken is ERC20 {
     }
 
     function stake(uint256 amount) external {
-        StakeInfo storage stakeInfo = stakeInfos[msg.sender];
         require(IERC20(token).allowance(msg.sender, address(this)) >= amount, "not enough allowance");
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
-        stakeInfo.amount += amount;
         _mint(msg.sender, amount);
+        emit Stake(msg.sender, amount);
     }
 
     function unstake(uint256 amount) external {
-        StakeInfo storage stakeInfo = stakeInfos[msg.sender];
-        require(amount <= stakeInfo.amount, "not enough to unstake");
-        stakeInfo.amount -= amount;
-        stakeInfo.cooldownAmount += amount;
-        stakeInfo.cooldownEndTimestamp = block.timestamp + cooldown;
+        CooldownInfo storage cooldownInfo = cooldownInfos[msg.sender];
+        require(amount <= balanceOf(msg.sender), "not enough to unstake");
+        cooldownInfo.cooldownAmount += amount;
+        cooldownInfo.cooldownEndTimestamp = block.timestamp + cooldown;
         _burn(msg.sender, amount);
+        emit UnStake(msg.sender, amount);
     }
 
     function withdraw(uint256 amount) external {
-        StakeInfo storage stakeInfo = stakeInfos[msg.sender];
-        require(stakeInfo.cooldownAmount >= amount, "not enough cooldown amount");
-        require(stakeInfo.cooldownEndTimestamp <= block.timestamp, "cooldowning");
+        CooldownInfo storage cooldownInfo = cooldownInfos[msg.sender];
+        require(cooldownInfo.cooldownAmount >= amount, "not enough cooldown amount");
+        require(cooldownInfo.cooldownEndTimestamp <= block.timestamp, "cooldowning");
         IERC20(token).safeTransfer(msg.sender, amount);
-        stakeInfo.cooldownAmount -= amount;
+        cooldownInfo.cooldownAmount -= amount;
+        emit Withdraw(msg.sender, amount);
     }
 }
