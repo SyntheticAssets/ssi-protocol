@@ -41,7 +41,7 @@ contract USSI is Ownable, AccessControlEnumerable, ERC20 {
     address public orderSigner;
     address public factoryAddress;
 
-    bytes32 public constant PARTICIPANT_ROLE = keccak256("PARTICIPANT");
+    bytes32 public constant PARTICIPANT_ROLE = keccak256("PARTICIPANT_ROLE");
 
     event AddAssetID(uint256 assetID);
     event RemoveAssetID(uint256 assetID);
