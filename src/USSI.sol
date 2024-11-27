@@ -2,6 +2,7 @@
 pragma solidity ^0.8.25;
 import './Interface.sol';
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -10,7 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "forge-std/console.sol";
 
-contract USSI is Ownable, ERC20 {
+contract USSI is Ownable, AccessControlEnumerable, ERC20 {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using EnumerableSet for EnumerableSet.UintSet;
     using SafeERC20 for IERC20;
@@ -40,6 +41,8 @@ contract USSI is Ownable, ERC20 {
     address public orderSigner;
     address public factoryAddress;
 
+    bytes32 public constant PARTICIPANT_ROLE = keccak256("PARTICIPANT");
+
     event AddAssetID(uint256 assetID);
     event RemoveAssetID(uint256 assetID);
     event UpdateOrderSigner(address oldOrderSigner, address orderSigner);
@@ -58,6 +61,7 @@ contract USSI is Ownable, ERC20 {
         factoryAddress = factoryAddress_;
         redeemToken = redeemToken_;
         orderSigner = orderSigner_;
+        _grantRole(DEFAULT_ADMIN_ROLE, owner);
     }
 
     function decimals() public pure override(ERC20) returns (uint8) {
@@ -113,7 +117,7 @@ contract USSI is Ownable, ERC20 {
         require(SignatureChecker.isValidSignatureNow(orderSigner, orderHash, orderSignature), "signature not valid");
     }
 
-    function applyMint(HedgeOrder calldata hedgeOrder, bytes calldata orderSignature) external {
+    function applyMint(HedgeOrder calldata hedgeOrder, bytes calldata orderSignature) external onlyRole(PARTICIPANT_ROLE) {
         require(hedgeOrder.requester == msg.sender, "msg sender is not requester");
         bytes32 orderHash = keccak256(abi.encode(hedgeOrder));
         checkHedgeOrder(hedgeOrder, orderHash, orderSignature);
@@ -160,7 +164,7 @@ contract USSI is Ownable, ERC20 {
         emit ConfirmMint(orderHash);
     }
 
-    function applyRedeem(HedgeOrder calldata hedgeOrder, bytes calldata orderSignature) external {
+    function applyRedeem(HedgeOrder calldata hedgeOrder, bytes calldata orderSignature) external onlyRole(PARTICIPANT_ROLE) {
         require(hedgeOrder.requester == msg.sender, "msg sender is not requester");
         bytes32 orderHash = keccak256(abi.encode(hedgeOrder));
         checkHedgeOrder(hedgeOrder, orderHash, orderSignature);

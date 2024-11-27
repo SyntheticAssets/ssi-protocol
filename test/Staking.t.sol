@@ -8,7 +8,7 @@ import "../src/AssetFactory.sol";
 import "../src/AssetIssuer.sol";
 import "../src/StakeFactory.sol";
 import "../src/AssetLocking.sol";
-import "../src/HedgeSSI.sol";
+import "../src/USSI.sol";
 
 
 import {Test, console} from "forge-std/Test.sol";
@@ -35,7 +35,7 @@ contract StakingTest is Test {
     StakeFactory stakeFactory;
     StakeToken stakeToken;
     AssetLocking assetLocking;
-    HedgeSSI hedgeSSI;
+    USSI uSSI;
 
     uint256 stakeAmount = 1e8;
 
@@ -65,7 +65,7 @@ contract StakingTest is Test {
         assetToken = AssetToken(assetTokenAddress);
         stakeFactory = new StakeFactory(owner, address(factory));
         assetLocking = new AssetLocking(owner);
-        hedgeSSI = new HedgeSSI(owner, orderSigner, address(factory), address(WBTC));
+        uSSI = new USSI(owner, orderSigner, address(factory), address(WBTC));
         vm.stopPrank();
         vm.startPrank(address(issuer));
         assetToken.mint(staker, stakeAmount);
@@ -162,10 +162,10 @@ contract StakingTest is Test {
         assertEq(stakeToken.balanceOf(address(assetLocking)), 0);
     }
 
-    function testHedge() public {
+    function testUSSI() public {
         // apply mint
-        HedgeSSI.HedgeOrder memory mintOrder = HedgeSSI.HedgeOrder({
-            orderType: HedgeSSI.HedgeOrderType.MINT,
+        USSI.HedgeOrder memory mintOrder = USSI.HedgeOrder({
+            orderType: USSI.HedgeOrderType.MINT,
             assetID: 1,
             redeemToken: address(0),
             nonce: 0,
@@ -176,29 +176,30 @@ contract StakingTest is Test {
         });
         vm.startPrank(hedger);
         vm.expectRevert();
-        hedgeSSI.applyMint(mintOrder, new bytes(10));
+        uSSI.applyMint(mintOrder, new bytes(10));
         vm.stopPrank();
         vm.startPrank(owner);
-        hedgeSSI.addSupportAsset(1);
+        uSSI.grantRole(uSSI.PARTICIPANT_ROLE(), hedger);
+        uSSI.addSupportAsset(1);
         vm.stopPrank();
         bytes32 orderHash = keccak256(abi.encode(mintOrder));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(orderSignerPk, orderHash);
         bytes memory orderSign = abi.encodePacked(r, s, v);
         vm.startPrank(hedger);
-        assetToken.approve(address(hedgeSSI), stakeAmount);
-        hedgeSSI.applyMint(mintOrder, orderSign);
+        assetToken.approve(address(uSSI), stakeAmount);
+        uSSI.applyMint(mintOrder, orderSign);
         vm.stopPrank();
         // confirm mint
         vm.startPrank(owner);
-        hedgeSSI.confirmMint(orderHash);
+        uSSI.confirmMint(orderHash);
         vm.stopPrank();
         assertEq(assetToken.balanceOf(hedger), 0);
-        assertEq(hedgeSSI.balanceOf(hedger), stakeAmount * 10);
+        assertEq(uSSI.balanceOf(hedger), stakeAmount * 10);
         // apply redeem
-        HedgeSSI.HedgeOrder memory redeemOrder = HedgeSSI.HedgeOrder({
-            orderType: HedgeSSI.HedgeOrderType.REDEEM,
+        USSI.HedgeOrder memory redeemOrder = USSI.HedgeOrder({
+            orderType: USSI.HedgeOrderType.REDEEM,
             assetID: 1,
-            redeemToken: hedgeSSI.redeemToken(),
+            redeemToken: uSSI.redeemToken(),
             nonce: 1,
             inAmount: stakeAmount * 10,
             outAmount: stakeAmount,
@@ -209,18 +210,18 @@ contract StakingTest is Test {
         (v, r, s) = vm.sign(orderSignerPk, orderHash);
         orderSign = abi.encodePacked(r, s, v);
         vm.startPrank(hedger);
-        hedgeSSI.approve(address(hedgeSSI), stakeAmount * 10);
-        hedgeSSI.applyRedeem(redeemOrder, orderSign);
+        uSSI.approve(address(uSSI), stakeAmount * 10);
+        uSSI.applyRedeem(redeemOrder, orderSign);
         vm.stopPrank();
         // confirm redeem
         vm.startPrank(owner);
         vm.expectRevert();
-        hedgeSSI.confirmRedeem(orderHash);
+        uSSI.confirmRedeem(orderHash);
         WBTC.mint(owner, stakeAmount);
-        WBTC.transfer(address(hedgeSSI), stakeAmount);
-        hedgeSSI.confirmRedeem(orderHash);
+        WBTC.transfer(address(uSSI), stakeAmount);
+        uSSI.confirmRedeem(orderHash);
         vm.stopPrank();
-        assertEq(hedgeSSI.balanceOf(hedger), 0);
+        assertEq(uSSI.balanceOf(hedger), 0);
         assertEq(WBTC.balanceOf(hedger), stakeAmount);
     }
 }
