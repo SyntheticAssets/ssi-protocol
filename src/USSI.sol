@@ -2,6 +2,7 @@
 pragma solidity ^0.8.25;
 import './Interface.sol';
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -10,7 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import "forge-std/console.sol";
 
-contract HedgeSSI is Ownable, ERC20 {
+contract USSI is Ownable, AccessControlEnumerable, ERC20 {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using EnumerableSet for EnumerableSet.UintSet;
     using SafeERC20 for IERC20;
@@ -21,6 +22,7 @@ contract HedgeSSI is Ownable, ERC20 {
     struct HedgeOrder {
         HedgeOrderType orderType;
         uint256 assetID;
+        address redeemToken;
         uint256 nonce;
         uint256 inAmount;
         uint256 outAmount;
@@ -39,13 +41,27 @@ contract HedgeSSI is Ownable, ERC20 {
     address public orderSigner;
     address public factoryAddress;
 
-    constructor(address owner, address orderSigner_, address factoryAddress_, address redeemToken_) Ownable(owner) ERC20("Hedged SSI", "hSSI") {
+    bytes32 public constant PARTICIPANT_ROLE = keccak256("PARTICIPANT_ROLE");
+
+    event AddAssetID(uint256 assetID);
+    event RemoveAssetID(uint256 assetID);
+    event UpdateOrderSigner(address oldOrderSigner, address orderSigner);
+    event UpdateRedeemToken(address oldRedeemToken, address redeemToken);
+    event ApplyMint(HedgeOrder hedgeOrder);
+    event RejectMint(bytes32 orderHash);
+    event ConfirmMint(bytes32 orderHash);
+    event ApplyRedeem(HedgeOrder hedgeOrder);
+    event RejectRedeem(bytes32 orderHash);
+    event ConfirmRedeem(bytes32 orderHash);
+
+    constructor(address owner, address orderSigner_, address factoryAddress_, address redeemToken_) Ownable(owner) ERC20("USSI", "USSI") {
         require(factoryAddress_ != address(0), "zero factory address");
         require(redeemToken_ != address(0), "zero redeem token address");
         require(orderSigner_ != address(0), "zero order signer address");
         factoryAddress = factoryAddress_;
         redeemToken = redeemToken_;
         orderSigner = orderSigner_;
+        _grantRole(DEFAULT_ADMIN_ROLE, owner);
     }
 
     function decimals() public pure override(ERC20) returns (uint8) {
@@ -63,18 +79,45 @@ contract HedgeSSI is Ownable, ERC20 {
         require(IAssetFactory(factoryAddress).hasAssetID(assetID), "asset not exists");
         require(!supportAssetIDs.contains(assetID), "already contains assetID");
         supportAssetIDs.add(assetID);
+        emit AddAssetID(assetID);
+    }
+
+    function removeSupportAsset(uint256 assetID) external onlyOwner {
+        require(IAssetFactory(factoryAddress).hasAssetID(assetID), "asset not exists");
+        require(supportAssetIDs.contains(assetID), "assetID is not supported");
+        supportAssetIDs.remove(assetID);
+        emit RemoveAssetID(assetID);
+    }
+
+    function updateOrderSigner(address orderSigner_) external onlyOwner {
+        address oldOrderSigner = orderSigner;
+        require(orderSigner_ != address(0), "orderSigner is zero address");
+        require(orderSigner_ != orderSigner, "orderSigner not change");
+        orderSigner = orderSigner_;
+        emit UpdateOrderSigner(oldOrderSigner, orderSigner);
+    }
+
+    function updateRedeemToken(address redeemToken_) external onlyOwner {
+        address oldRedeemToken = redeemToken;
+        require(redeemToken_ != address(0), "redeem token is zero address");
+        require(redeemToken_ != redeemToken, "redeem token not change");
+        redeemToken = redeemToken_;
+        emit UpdateRedeemToken(oldRedeemToken, redeemToken);
     }
 
     function checkHedgeOrder(HedgeOrder calldata hedgeOrder, bytes32 orderHash, bytes calldata orderSignature) public view {
         if (hedgeOrder.orderType == HedgeOrderType.MINT) {
             require(supportAssetIDs.contains(hedgeOrder.assetID), "assetID not supported");
         }
+        if (hedgeOrder.orderType == HedgeOrderType.REDEEM) {
+            require(redeemToken == hedgeOrder.redeemToken, "redeem token not supported");
+        }
         require(block.timestamp <= hedgeOrder.deadline, "expired");
         require(!orderHashs.contains(orderHash), "order already exists");
         require(SignatureChecker.isValidSignatureNow(orderSigner, orderHash, orderSignature), "signature not valid");
     }
 
-    function applyMint(HedgeOrder calldata hedgeOrder, bytes calldata orderSignature) external {
+    function applyMint(HedgeOrder calldata hedgeOrder, bytes calldata orderSignature) external onlyRole(PARTICIPANT_ROLE) {
         require(hedgeOrder.requester == msg.sender, "msg sender is not requester");
         bytes32 orderHash = keccak256(abi.encode(hedgeOrder));
         checkHedgeOrder(hedgeOrder, orderHash, orderSignature);
@@ -93,6 +136,7 @@ contract HedgeSSI is Ownable, ERC20 {
         orderHashs.add(orderHash);
         orderStatus[orderHash] = HedgeOrderStatus.PENDING;
         requestTimestamps[orderHash] = block.timestamp;
+        emit ApplyMint(hedgeOrder);
     }
 
     function rejectMint(bytes32 orderHash) external onlyOwner {
@@ -102,6 +146,7 @@ contract HedgeSSI is Ownable, ERC20 {
         IERC20 assetToken = IERC20(IAssetFactory(factoryAddress).assetTokens(hedgeOrder.assetID));
         assetToken.transfer(hedgeOrder.requester, hedgeOrder.inAmount);
         orderStatus[orderHash] = HedgeOrderStatus.REJECTED;
+        emit RejectMint(orderHash);
     }
 
     function confirmMint(bytes32 orderHash) external onlyOwner {
@@ -116,9 +161,10 @@ contract HedgeSSI is Ownable, ERC20 {
             assetToken.approve(address(issuer), type(uint256).max);
         }
         issuer.burnFor(hedgeOrder.assetID, hedgeOrder.inAmount);
+        emit ConfirmMint(orderHash);
     }
 
-    function applyRedeem(HedgeOrder calldata hedgeOrder, bytes calldata orderSignature) external {
+    function applyRedeem(HedgeOrder calldata hedgeOrder, bytes calldata orderSignature) external onlyRole(PARTICIPANT_ROLE) {
         require(hedgeOrder.requester == msg.sender, "msg sender is not requester");
         bytes32 orderHash = keccak256(abi.encode(hedgeOrder));
         checkHedgeOrder(hedgeOrder, orderHash, orderSignature);
@@ -127,7 +173,7 @@ contract HedgeSSI is Ownable, ERC20 {
         IERC20(address(this)).safeTransferFrom(hedgeOrder.requester, address(this), hedgeOrder.inAmount);
         HedgeOrder storage hedgeOrder_ = hedgeOrders[orderHash];
         hedgeOrder_.orderType = hedgeOrder.orderType;
-        hedgeOrder_.assetID = hedgeOrder.assetID;
+        hedgeOrder_.redeemToken = hedgeOrder.redeemToken;
         hedgeOrder_.nonce = hedgeOrder.nonce;
         hedgeOrder_.inAmount = hedgeOrder.inAmount;
         hedgeOrder_.outAmount = hedgeOrder.outAmount;
@@ -136,6 +182,7 @@ contract HedgeSSI is Ownable, ERC20 {
         orderHashs.add(orderHash);
         orderStatus[orderHash] = HedgeOrderStatus.PENDING;
         requestTimestamps[orderHash] = block.timestamp;
+        emit ApplyRedeem(hedgeOrder);
     }
 
     function rejectRedeem(bytes32 orderHash) external onlyOwner {
@@ -144,14 +191,32 @@ contract HedgeSSI is Ownable, ERC20 {
         HedgeOrder storage hedgeOrder = hedgeOrders[orderHash];
         transfer(hedgeOrder.requester, hedgeOrder.inAmount);
         orderStatus[orderHash] = HedgeOrderStatus.REJECTED;
+        emit RejectRedeem(orderHash);
     }
 
     function confirmRedeem(bytes32 orderHash) external onlyOwner {
         require(orderHashs.contains(orderHash), "order not exists");
         require(orderStatus[orderHash] == HedgeOrderStatus.PENDING, "order is not pending");
         HedgeOrder storage hedgeOrder = hedgeOrders[orderHash];
-        IERC20(redeemToken).safeTransfer(hedgeOrder.requester, hedgeOrder.outAmount);
+        require(IERC20(hedgeOrder.redeemToken).balanceOf(address(this)) >= hedgeOrder.outAmount, "not enough redeem token");
+        IERC20(hedgeOrder.redeemToken).safeTransfer(hedgeOrder.requester, hedgeOrder.outAmount);
         _burn(address(this), hedgeOrder.inAmount);
         orderStatus[orderHash] = HedgeOrderStatus.CONFIRMED;
+        emit ConfirmRedeem(orderHash);
+    }
+
+    function getOrderHashs() external view returns (bytes32[] memory orderHashs_) {
+        orderHashs_ = new bytes32[](orderHashs.length());
+        for (uint i = 0; i < orderHashs.length(); i++) {
+            orderHashs_[i] = orderHashs.at(i);
+        }
+    }
+
+    function getOrderHashLength() external view returns (uint256) {
+        return orderHashs.length();
+    }
+
+    function getOrderHash(uint256 nonce) external view returns (bytes32) {
+        return orderHashs.at(nonce);
     }
 }
