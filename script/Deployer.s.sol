@@ -7,6 +7,10 @@ import {AssetFactory} from "../src/AssetFactory.sol";
 import {AssetIssuer} from "../src/AssetIssuer.sol";
 import {AssetRebalancer} from "../src/AssetRebalancer.sol";
 import {AssetFeeManager} from "../src/AssetFeeManager.sol";
+import {StakeFactory} from "../src/StakeFactory.sol";
+import {StakeToken} from "../src/StakeToken.sol";
+import {AssetLocking} from "../src/AssetLocking.sol";
+import {USSI} from "../src/USSI.sol";
 
 contract DeployAssetController is Script {
     function setUp() public {}
@@ -14,76 +18,29 @@ contract DeployAssetController is Script {
     function run() public {
         address owner = vm.envAddress("OWNER");
         address vault = vm.envAddress("VAULT");
+        address orderSigner = vm.envAddress("ORDER_SIGNER");
+        address redeemToken = vm.envAddress("REDEEM_TOKEN");
         string memory chain = vm.envString("CHAIN_CODE");
         vm.startBroadcast();
-        address Swap_proxy = Upgrades.deployTransparentProxy(
-            "Swap.sol",
-            owner,
-            abi.encodeCall(Swap.initialize, (owner, chain))
-        );
-
-        address AssetFactory_proxy = Upgrades.deployTransparentProxy(
-            "AssetFactory.sol",
-            owner,
-            abi.encodeCall(
-                AssetFactory.initialize,
-                (owner, Swap_proxy, vault, chain)
-            )
-        );
-
-        address AssetIssuer_proxy = Upgrades.deployTransparentProxy(
-            "AssetIssuer.sol",
-            owner,
-            abi.encodeCall(AssetIssuer.initialize, (owner, AssetFactory_proxy))
-        );
-
-        address AssetRebalancer_proxy = Upgrades.deployTransparentProxy(
-            "AssetRebalancer.sol",
-            owner,
-            abi.encodeCall(
-                AssetRebalancer.initialize,
-                (owner, AssetFactory_proxy)
-            )
-        );
-
-        address AssetFeeManager_proxy = Upgrades.deployTransparentProxy(
-            "AssetFeeManager.sol",
-            owner,
-            abi.encodeCall(
-                AssetFeeManager.initialize,
-                (owner, AssetFactory_proxy)
-            )
-        );
+        address swap = Upgrades.deployTransparentProxy("Swap.sol", owner, abi.encodeCall(Swap.initialize, (owner, chain)));
+        address factory = Upgrades.deployTransparentProxy("AssetFactory.sol", owner, abi.encodeCall(AssetFactory.initialize, (owner, swap, vault, chain)));
+        address issuer = Upgrades.deployTransparentProxy("AssetIssuer.sol", owner, abi.encodeCall(AssetIssuer.initialize, (owner, factory)));
+        address rebalancer = Upgrades.deployTransparentProxy("AssetRebalancer.sol", owner, abi.encodeCall(AssetRebalancer.initialize, (owner, factory)));
+        address feeManager = Upgrades.deployTransparentProxy("AssetFeeManager.sol", owner, abi.encodeCall(AssetFeeManager.initialize, (owner, factory)));
         vm.stopBroadcast();
-        console.log(
-            string.concat("Swap_proxy=", vm.toString(address(Swap_proxy)))
-        );
-        console.log(
-            string.concat(
-                "AssetFactory_proxy=",
-                vm.toString(address(AssetFactory_proxy))
-            )
-        );
-
-        console.log(
-            string.concat(
-                "AssetIssuer_proxy=",
-                vm.toString(address(AssetIssuer_proxy))
-            )
-        );
-
-        console.log(
-            string.concat(
-                "AssetRebalancer_proxy=",
-                vm.toString(address(AssetRebalancer_proxy))
-            )
-        );
-
-        console.log(
-            string.concat(
-                "AssetFeeManager_proxy=",
-                vm.toString(address(AssetFeeManager_proxy))
-            )
-        );
+        StakeFactory stakeFactory = new StakeFactory(owner, address(factory));
+        AssetLocking assetLocking = new AssetLocking(owner);
+        USSI uSSI = new USSI(owner, orderSigner, address(factory), redeemToken);
+        StakeToken sUSSI = new StakeToken("Staked USSI", "sUSSI", address(uSSI), 7 days);
+        vm.stopBroadcast();
+        console.log(string.concat("swap=", vm.toString(address(swap))));
+        console.log(string.concat("factory=", vm.toString(address(factory))));
+        console.log(string.concat("issuer=", vm.toString(address(issuer))));
+        console.log(string.concat("rebalancer=", vm.toString(address(rebalancer))));
+        console.log(string.concat("feeManager=", vm.toString(address(feeManager))));
+        console.log(string.concat("stakeFactory=", vm.toString(address(stakeFactory))));
+        console.log(string.concat("assetLocking=", vm.toString(address(assetLocking))));
+        console.log(string.concat("USSI=", vm.toString(address(uSSI))));
+        console.log(string.concat("sUSSI=", vm.toString(address(sUSSI))));
     }
 }

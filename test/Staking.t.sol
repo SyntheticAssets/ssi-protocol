@@ -7,13 +7,19 @@ import "../src/Swap.sol";
 import "../src/AssetFactory.sol";
 import "../src/AssetIssuer.sol";
 import "../src/StakeFactory.sol";
+<<<<<<< HEAD
 import "../src/AssetStaking.sol";
 import "../src/HedgeSSI.sol";
 import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
+=======
+import "../src/AssetLocking.sol";
+import "../src/USSI.sol";
+
+>>>>>>> main
 
 import {Test, console} from "forge-std/Test.sol";
 
-contract FundManagerTest is Test {
+contract StakingTest is Test {
     MockToken WBTC = new MockToken("Wrapped BTC", "WBTC", 8);
     MockToken WETH = new MockToken("Wrapped ETH", "WETH", 18);
 
@@ -34,11 +40,8 @@ contract FundManagerTest is Test {
     AssetFactory factory;
     StakeFactory stakeFactory;
     StakeToken stakeToken;
-    AssetStaking assetStaking;
-    HedgeSSI hedgeSSI;
-    address swapProxy;
-    address assetFactoryProxy;
-    address assetIssuerProxy;
+    AssetLocking assetLocking;
+    USSI uSSI;
 
     uint256 stakeAmount = 1e8;
 
@@ -96,13 +99,8 @@ contract FundManagerTest is Test {
         );
         assetToken = AssetToken(assetTokenAddress);
         stakeFactory = new StakeFactory(owner, address(factory));
-        assetStaking = new AssetStaking(owner);
-        hedgeSSI = new HedgeSSI(
-            owner,
-            orderSigner,
-            address(factory),
-            address(WBTC)
-        );
+        assetLocking = new AssetLocking(owner);
+        uSSI = new USSI(owner, orderSigner, address(factory), address(WBTC));
         vm.stopPrank();
         vm.startPrank(address(issuer));
         assetToken.mint(staker, stakeAmount);
@@ -134,12 +132,9 @@ contract FundManagerTest is Test {
         uint256 unstakeAmount = (stakeAmount * 50) / 100;
         stakeToken.unstake(unstakeAmount);
         vm.stopPrank();
-        (
-            uint256 amount,
-            uint256 cooldownAmount,
-            uint256 cooldownEndTimestamp
-        ) = stakeToken.stakeInfos(staker);
         assertEq(amount, stakeAmount - cooldownAmount);
+        (uint256 cooldownAmount, uint256 cooldownEndTimestamp) = stakeToken.cooldownInfos(staker);
+        assertEq(cooldownAmount, stakeAmount - cooldownAmount);
         assertEq(unstakeAmount, cooldownAmount);
         assertEq(cooldownEndTimestamp, block.timestamp + stakeToken.cooldown());
         // check balance
@@ -149,9 +144,9 @@ contract FundManagerTest is Test {
         // withdraw
         vm.startPrank(staker);
         vm.expectRevert();
-        stakeToken.withdraw();
+        stakeToken.withdraw(cooldownAmount);
         vm.warp(block.timestamp + stakeToken.cooldown());
-        stakeToken.withdraw();
+        stakeToken.withdraw(cooldownAmount);
         // check balance
         assertEq(assetToken.balanceOf(staker), unstakeAmount);
         assertEq(stakeToken.balanceOf(staker), stakeAmount - unstakeAmount);
@@ -163,61 +158,54 @@ contract FundManagerTest is Test {
         // can not lock
         vm.startPrank(staker);
         vm.expectRevert();
-        assetStaking.stake(address(stakeToken), lockAmount);
+        assetLocking.lock(address(stakeToken), lockAmount);
         vm.stopPrank();
         // owner update stake config
         vm.startPrank(owner);
-        assetStaking.updateStakeConfig(
-            address(stakeToken),
-            0,
-            lockAmount * 2,
-            7 days
-        );
+        assetLocking.updateLockConfig(address(stakeToken), 0, lockAmount * 2, 7 days);
         vm.stopPrank();
         // can lock
         vm.startPrank(staker);
-        stakeToken.approve(address(assetStaking), lockAmount);
-        assetStaking.stake(address(stakeToken), lockAmount);
+        stakeToken.approve(address(assetLocking), lockAmount);
+        assetLocking.lock(address(stakeToken), lockAmount);
         vm.stopPrank();
         assertEq(stakeToken.balanceOf(staker), 0);
-        assertEq(stakeToken.balanceOf(address(assetStaking)), lockAmount);
-        (amount, cooldownAmount, cooldownEndTimestamp) = assetStaking
-            .stakeDatas(address(stakeToken), staker);
+        assertEq(stakeToken.balanceOf(address(assetLocking)), lockAmount);
+        uint256 amount;
+        (amount, cooldownAmount, cooldownEndTimestamp) = assetLocking.lockDatas(address(stakeToken), staker);
         assertEq(amount, lockAmount);
         assertEq(cooldownAmount, 0);
         assertEq(cooldownEndTimestamp, 0);
         // unlock
         vm.startPrank(staker);
         vm.expectRevert();
-        assetStaking.unstake(address(stakeToken), lockAmount + 1);
-        assetStaking.unstake(address(stakeToken), lockAmount);
+        assetLocking.unlock(address(stakeToken), lockAmount + 1);
+        assetLocking.unlock(address(stakeToken), lockAmount);
         vm.stopPrank();
         assertEq(stakeToken.balanceOf(staker), 0);
-        assertEq(stakeToken.balanceOf(address(assetStaking)), lockAmount);
-        (amount, cooldownAmount, cooldownEndTimestamp) = assetStaking
-            .stakeDatas(address(stakeToken), staker);
-        (, , uint256 cooldown, , ) = assetStaking.stakeConfigs(
-            address(stakeToken)
-        );
+        assertEq(stakeToken.balanceOf(address(assetLocking)), lockAmount);
+        (amount, cooldownAmount, cooldownEndTimestamp) = assetLocking.lockDatas(address(stakeToken), staker);
+        (,,uint256 cooldown,,) = assetLocking.lockConfigs(address(stakeToken));
         assertEq(amount, 0);
         assertEq(cooldownAmount, lockAmount);
         assertEq(cooldownEndTimestamp, block.timestamp + cooldown);
         // withdraw
         vm.startPrank(staker);
         vm.expectRevert();
-        assetStaking.withdraw(address(stakeToken), lockAmount);
+        assetLocking.withdraw(address(stakeToken), lockAmount);
         vm.warp(block.timestamp + cooldown);
-        assetStaking.withdraw(address(stakeToken), lockAmount);
+        assetLocking.withdraw(address(stakeToken), lockAmount);
         vm.stopPrank();
         assertEq(stakeToken.balanceOf(staker), lockAmount);
-        assertEq(stakeToken.balanceOf(address(assetStaking)), 0);
+        assertEq(stakeToken.balanceOf(address(assetLocking)), 0);
     }
 
-    function testHedge() public {
+    function testUSSI() public {
         // apply mint
-        HedgeSSI.HedgeOrder memory mintOrder = HedgeSSI.HedgeOrder({
-            orderType: HedgeSSI.HedgeOrderType.MINT,
+        USSI.HedgeOrder memory mintOrder = USSI.HedgeOrder({
+            orderType: USSI.HedgeOrderType.MINT,
             assetID: 1,
+            redeemToken: address(0),
             nonce: 0,
             inAmount: stakeAmount,
             outAmount: stakeAmount * 10,
@@ -226,28 +214,30 @@ contract FundManagerTest is Test {
         });
         vm.startPrank(hedger);
         vm.expectRevert();
-        hedgeSSI.applyMint(mintOrder, new bytes(10));
+        uSSI.applyMint(mintOrder, new bytes(10));
         vm.stopPrank();
         vm.startPrank(owner);
-        hedgeSSI.addSupportAsset(1);
+        uSSI.grantRole(uSSI.PARTICIPANT_ROLE(), hedger);
+        uSSI.addSupportAsset(1);
         vm.stopPrank();
         bytes32 orderHash = keccak256(abi.encode(mintOrder));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(orderSignerPk, orderHash);
         bytes memory orderSign = abi.encodePacked(r, s, v);
         vm.startPrank(hedger);
-        assetToken.approve(address(hedgeSSI), stakeAmount);
-        hedgeSSI.applyMint(mintOrder, orderSign);
+        assetToken.approve(address(uSSI), stakeAmount);
+        uSSI.applyMint(mintOrder, orderSign);
         vm.stopPrank();
         // confirm mint
         vm.startPrank(owner);
-        hedgeSSI.confirmMint(orderHash);
+        uSSI.confirmMint(orderHash);
         vm.stopPrank();
         assertEq(assetToken.balanceOf(hedger), 0);
-        assertEq(hedgeSSI.balanceOf(hedger), stakeAmount * 10);
+        assertEq(uSSI.balanceOf(hedger), stakeAmount * 10);
         // apply redeem
-        HedgeSSI.HedgeOrder memory redeemOrder = HedgeSSI.HedgeOrder({
-            orderType: HedgeSSI.HedgeOrderType.REDEEM,
+        USSI.HedgeOrder memory redeemOrder = USSI.HedgeOrder({
+            orderType: USSI.HedgeOrderType.REDEEM,
             assetID: 1,
+            redeemToken: uSSI.redeemToken(),
             nonce: 1,
             inAmount: stakeAmount * 10,
             outAmount: stakeAmount,
@@ -258,18 +248,18 @@ contract FundManagerTest is Test {
         (v, r, s) = vm.sign(orderSignerPk, orderHash);
         orderSign = abi.encodePacked(r, s, v);
         vm.startPrank(hedger);
-        hedgeSSI.approve(address(hedgeSSI), stakeAmount * 10);
-        hedgeSSI.applyRedeem(redeemOrder, orderSign);
+        uSSI.approve(address(uSSI), stakeAmount * 10);
+        uSSI.applyRedeem(redeemOrder, orderSign);
         vm.stopPrank();
         // confirm redeem
         vm.startPrank(owner);
         vm.expectRevert();
-        hedgeSSI.confirmRedeem(orderHash);
+        uSSI.confirmRedeem(orderHash);
         WBTC.mint(owner, stakeAmount);
-        WBTC.transfer(address(hedgeSSI), stakeAmount);
-        hedgeSSI.confirmRedeem(orderHash);
+        WBTC.transfer(address(uSSI), stakeAmount);
+        uSSI.confirmRedeem(orderHash);
         vm.stopPrank();
-        assertEq(hedgeSSI.balanceOf(hedger), 0);
+        assertEq(uSSI.balanceOf(hedger), 0);
         assertEq(WBTC.balanceOf(hedger), stakeAmount);
     }
 }

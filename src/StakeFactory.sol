@@ -8,13 +8,16 @@ import "forge-std/console.sol";
 
 contract StakeFactory is Ownable {
     address public factoryAddress;
-    mapping(uint256 => address) stakeTokens;
+    mapping(uint256 => address) public stakeTokens;
+
+    event CreateStakeToken(address stakeToken, uint256 assetID, uint48 cooldown);
 
     constructor(address owner, address factoryAddress_) Ownable(owner) {
         factoryAddress = factoryAddress_;
     }
 
     function createStakeToken(uint256 assetID, uint48 cooldown) external onlyOwner returns (address stakeToken)  {
+        require(stakeTokens[assetID] == address(0), "stake token already exists");
         IAssetFactory factory = IAssetFactory(factoryAddress);
         address assetToken = factory.assetTokens(assetID);
         require(assetToken != address(0), "asset token not exists");
@@ -27,5 +30,6 @@ contract StakeFactory is Ownable {
             cooldown
         ));
         stakeTokens[assetID] = stakeToken;
+        emit CreateStakeToken(stakeToken, assetID, cooldown);
     }
 }
