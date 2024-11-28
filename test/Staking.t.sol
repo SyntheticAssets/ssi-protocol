@@ -7,15 +7,9 @@ import "../src/Swap.sol";
 import "../src/AssetFactory.sol";
 import "../src/AssetIssuer.sol";
 import "../src/StakeFactory.sol";
-<<<<<<< HEAD
-import "../src/AssetStaking.sol";
-import "../src/HedgeSSI.sol";
-import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
-=======
 import "../src/AssetLocking.sol";
 import "../src/USSI.sol";
-
->>>>>>> main
+import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
 import {Test, console} from "forge-std/Test.sol";
 
@@ -65,38 +59,10 @@ contract StakingTest is Test {
 
     function setUp() public {
         vm.startPrank(owner);
-
-        swapProxy = Upgrades.deployTransparentProxy(
-            "Swap.sol",
-            owner,
-            abi.encodeCall(Swap.initialize, (owner, "SETH"))
-        );
-
-        assetFactoryProxy = Upgrades.deployTransparentProxy(
-            "AssetFactory.sol",
-            owner,
-            abi.encodeCall(
-                AssetFactory.initialize,
-                (owner, swapProxy, vault, "SETH")
-            )
-        );
-        factory = AssetFactory(assetFactoryProxy);
-        // factory = new AssetFactory(owner, swap, vault, "SETH");
-        assetIssuerProxy = Upgrades.deployTransparentProxy(
-            "AssetIssuer.sol",
-            owner,
-            abi.encodeCall(AssetIssuer.initialize, (owner, assetFactoryProxy))
-        );
-        issuer = AssetIssuer(assetIssuerProxy);
-        // issuer = new AssetIssuer(owner, address(factory));
-
-        address assetTokenAddress = factory.createAssetToken(
-            getAsset(),
-            10000,
-            address(issuer),
-            rebalancer,
-            feeManager
-        );
+        swap = Upgrades.deployTransparentProxy("Swap.sol", owner, abi.encodeCall(Swap.initialize, (owner, "SETH")));
+        factory = AssetFactory(Upgrades.deployTransparentProxy("AssetFactory.sol", owner,abi.encodeCall(AssetFactory.initialize, (owner, swap, vault, "SETH"))));
+        issuer = AssetIssuer(Upgrades.deployTransparentProxy("AssetIssuer.sol", owner, abi.encodeCall(AssetIssuer.initialize, (owner, address(factory)))));
+        address assetTokenAddress = factory.createAssetToken(getAsset(), 10000, address(issuer), rebalancer, feeManager);
         assetToken = AssetToken(assetTokenAddress);
         stakeFactory = new StakeFactory(owner, address(factory));
         assetLocking = new AssetLocking(owner);
@@ -132,8 +98,9 @@ contract StakingTest is Test {
         uint256 unstakeAmount = (stakeAmount * 50) / 100;
         stakeToken.unstake(unstakeAmount);
         vm.stopPrank();
-        assertEq(amount, stakeAmount - cooldownAmount);
         (uint256 cooldownAmount, uint256 cooldownEndTimestamp) = stakeToken.cooldownInfos(staker);
+        uint256 amount = stakeToken.balanceOf(staker);
+        assertEq(amount, stakeAmount - cooldownAmount);
         assertEq(cooldownAmount, stakeAmount - cooldownAmount);
         assertEq(unstakeAmount, cooldownAmount);
         assertEq(cooldownEndTimestamp, block.timestamp + stakeToken.cooldown());
@@ -171,7 +138,6 @@ contract StakingTest is Test {
         vm.stopPrank();
         assertEq(stakeToken.balanceOf(staker), 0);
         assertEq(stakeToken.balanceOf(address(assetLocking)), lockAmount);
-        uint256 amount;
         (amount, cooldownAmount, cooldownEndTimestamp) = assetLocking.lockDatas(address(stakeToken), staker);
         assertEq(amount, lockAmount);
         assertEq(cooldownAmount, 0);
