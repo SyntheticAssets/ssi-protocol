@@ -5,9 +5,10 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import {Utils} from './Utils.sol';
 
-contract Swap is AccessControl, ISwap {
+contract Swap is AccessControl, Pausable, ISwap {
     using SafeERC20 for IERC20;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
@@ -32,6 +33,14 @@ contract Swap is AccessControl, ISwap {
     constructor(address owner, string memory chain_) {
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
         chain = chain_;
+    }
+
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
     }
 
     function checkOrderInfo(OrderInfo memory orderInfo) public view returns (uint) {
@@ -94,7 +103,7 @@ contract Swap is AccessControl, ISwap {
         }
     }
 
-    function addSwapRequest(OrderInfo memory orderInfo, bool inByContract, bool outByContract) external onlyRole(TAKER_ROLE) {
+    function addSwapRequest(OrderInfo memory orderInfo, bool inByContract, bool outByContract) external onlyRole(TAKER_ROLE) whenNotPaused {
         uint code = checkOrderInfo(orderInfo);
         require(code == 0, "order not valid");
         swapRequests[orderInfo.orderHash].status = SwapRequestStatus.PENDING;
@@ -116,7 +125,7 @@ contract Swap is AccessControl, ISwap {
         return swapRequests[orderHash];
     }
 
-    function makerRejectSwapRequest(OrderInfo memory orderInfo) external onlyRole(MAKER_ROLE) {
+    function makerRejectSwapRequest(OrderInfo memory orderInfo) external onlyRole(MAKER_ROLE) whenNotPaused {
         validateOrderInfo(orderInfo);
         bytes32 orderHash = orderInfo.orderHash;
         require(orderInfo.order.maker == msg.sender, "not order maker");
@@ -138,7 +147,7 @@ contract Swap is AccessControl, ISwap {
         }
     }
 
-    function makerConfirmSwapRequest(OrderInfo memory orderInfo, bytes[] memory outTxHashs) external onlyRole(MAKER_ROLE) {
+    function makerConfirmSwapRequest(OrderInfo memory orderInfo, bytes[] memory outTxHashs) external onlyRole(MAKER_ROLE) whenNotPaused {
         validateOrderInfo(orderInfo);
         bytes32 orderHash = orderInfo.orderHash;
         SwapRequest memory swapRequest = swapRequests[orderHash];
@@ -155,7 +164,7 @@ contract Swap is AccessControl, ISwap {
         emit MakerConfirmSwapRequest(msg.sender, orderHash);
     }
 
-    function rollbackSwapRequest(OrderInfo memory orderInfo) external onlyRole(TAKER_ROLE) {
+    function rollbackSwapRequest(OrderInfo memory orderInfo) external onlyRole(TAKER_ROLE) whenNotPaused {
         validateOrderInfo(orderInfo);
         bytes32 orderHash = orderInfo.orderHash;
         require(swapRequests[orderHash].requester == msg.sender, "not order taker");
@@ -166,7 +175,7 @@ contract Swap is AccessControl, ISwap {
         emit RollbackSwapRequest(msg.sender, orderHash);
     }
 
-    function confirmSwapRequest(OrderInfo memory orderInfo, bytes[] memory inTxHashs) external onlyRole(TAKER_ROLE) {
+    function confirmSwapRequest(OrderInfo memory orderInfo, bytes[] memory inTxHashs) external onlyRole(TAKER_ROLE) whenNotPaused {
         validateOrderInfo(orderInfo);
         bytes32 orderHash = orderInfo.orderHash;
         SwapRequest memory swapRequest = swapRequests[orderHash];

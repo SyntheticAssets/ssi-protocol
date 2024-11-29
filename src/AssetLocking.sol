@@ -7,9 +7,10 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "forge-std/console.sol";
 
-contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable {
+contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
@@ -22,9 +23,18 @@ contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     function initialize(address owner) public initializer {
         __Ownable_init(owner);
         __UUPSUpgradeable_init();
+        __Pausable_init();
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     uint48 public constant MAX_COOLDOWN = 90 days;
 
@@ -82,7 +92,7 @@ contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         }
     }
 
-    function lock(address token, uint256 amount) external {
+    function lock(address token, uint256 amount) external whenNotPaused {
         require(tokens_.contains(token), "token not supported");
         require(lockConfigs[token].epoch == activeEpochs[token], "token cannot stake now");
         LockData storage lockData = lockDatas[token][msg.sender];
@@ -95,7 +105,7 @@ contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit Lock(msg.sender, token, amount);
     }
 
-    function unlock(address token, uint256 amount) external {
+    function unlock(address token, uint256 amount) external whenNotPaused {
         LockData storage lockData = lockDatas[token][msg.sender];
         LockConfig storage lockConfig = lockConfigs[token];
         require(lockData.amount >= amount, "not enough balance to unlock");
@@ -107,7 +117,7 @@ contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         emit UnLock(msg.sender, token, amount);
     }
 
-    function withdraw(address token, uint256 amount) external {
+    function withdraw(address token, uint256 amount) external whenNotPaused {
         LockData storage lockData = lockDatas[token][msg.sender];
         require(lockData.cooldownAmount > 0, "nothing to withdraw");
         require(lockData.cooldownEndTimestamp <= block.timestamp, "coolingdown");
