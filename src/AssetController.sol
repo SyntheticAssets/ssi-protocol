@@ -2,12 +2,21 @@
 pragma solidity ^0.8.25;
 import './Interface.sol';
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
-contract AssetController is Ownable, IAssetController {
+contract AssetController is Ownable, Pausable, IAssetController {
     address public factoryAddress;
 
     constructor(address owner, address factoryAddress_) Ownable(owner) {
         factoryAddress = factoryAddress_;
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     function checkRequestOrderInfo(Request memory request, OrderInfo memory orderInfo) internal pure {

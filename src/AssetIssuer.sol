@@ -26,10 +26,8 @@ contract AssetIssuer is AssetController, IAssetIssuer {
     Request[] mintRequests;
     Request[] redeemRequests;
 
-    bool public paused;
     uint256 public feeDecimals = 8;
 
-    event TogglePaused(bool paused);
     event SetIssueAmountRange(uint indexed assetID, uint min, uint max);
     event SetIssueFee(uint indexed assetID, uint issueFee);
     event AddParticipant(uint indexed assetID, address participant);
@@ -43,16 +41,6 @@ contract AssetIssuer is AssetController, IAssetIssuer {
 
     constructor(address owner, address factoryAddress_)
         AssetController(owner, factoryAddress_) {
-    }
-
-    function pause() external onlyOwner {
-        paused = true;
-        emit TogglePaused(paused);
-    }
-
-    function unpause() external onlyOwner {
-        paused = false;
-        emit TogglePaused(paused);
     }
 
     function getIssueAmountRange(uint256 assetID) external view returns (Range memory) {
@@ -90,8 +78,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         return mintRequests[nonce];
     }
 
-    function addMintRequest(uint256 assetID, OrderInfo memory orderInfo) external returns (uint) {
-        require(!paused, "paused");
+    function addMintRequest(uint256 assetID, OrderInfo memory orderInfo) external whenNotPaused returns (uint) {
         require(_participants[assetID].contains(msg.sender), "msg sender not a participant");
         require(_minAmounts.contains(assetID) && _maxAmounts.contains(assetID), "issue amount range not set");
         require(_issueFees.contains(assetID), "issue fee not set");
@@ -206,8 +193,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         return redeemRequests[nonce];
     }
 
-    function addRedeemRequest(uint256 assetID, OrderInfo memory orderInfo) external returns (uint256) {
-        require(!paused, "paused");
+    function addRedeemRequest(uint256 assetID, OrderInfo memory orderInfo) external whenNotPaused returns (uint256) {
         require(_participants[assetID].contains(msg.sender), "msg sender not a participant");
         require(_minAmounts.contains(assetID) && _maxAmounts.contains(assetID), "issue amount range not set");
         require(_issueFees.contains(assetID), "issue fee not set");
@@ -341,8 +327,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         }
     }
 
-    function burnFor(uint256 assetID, uint256 amount) external {
-        require(!paused, "paused");
+    function burnFor(uint256 assetID, uint256 amount) external whenNotPaused {
         IAssetFactory factory = IAssetFactory(factoryAddress);
         IAssetToken assetToken = IAssetToken(factory.assetTokens(assetID));
         require(assetToken.allowance(msg.sender, address(this)) >= amount, "not enough allowance");

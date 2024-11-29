@@ -6,9 +6,10 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "forge-std/console.sol";
 
-contract StakeToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
+contract StakeToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     address public token;
@@ -36,6 +37,7 @@ contract StakeToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
         __ERC20_init(name_, symbol_);
         __Ownable_init(owner_);
         __UUPSUpgradeable_init();
+        __Pausable_init();
         require(token_ != address(0), "token address is zero");
         require(cooldown_ < MAX_COOLDOWN, "cooldown exceeds MAX_COOLDOWN");
         token = token_;
@@ -44,19 +46,26 @@ contract StakeToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     function decimals() public view override(ERC20Upgradeable) returns (uint8) {
         return ERC20Upgradeable(token).decimals();
     }
 
-    function stake(uint256 amount) external {
+    function stake(uint256 amount) external whenNotPaused {
         require(IERC20(token).allowance(msg.sender, address(this)) >= amount, "not enough allowance");
         IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         _mint(msg.sender, amount);
         emit Stake(msg.sender, amount);
     }
 
-    function unstake(uint256 amount) external {
+    function unstake(uint256 amount) external whenNotPaused {
         CooldownInfo storage cooldownInfo = cooldownInfos[msg.sender];
         require(amount <= balanceOf(msg.sender), "not enough to unstake");
         cooldownInfo.cooldownAmount += amount;
@@ -65,7 +74,7 @@ contract StakeToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
         emit UnStake(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) external {
+    function withdraw(uint256 amount) external whenNotPaused {
         CooldownInfo storage cooldownInfo = cooldownInfos[msg.sender];
         require(cooldownInfo.cooldownAmount >= amount, "not enough cooldown amount");
         require(cooldownInfo.cooldownEndTimestamp <= block.timestamp, "cooldowning");
