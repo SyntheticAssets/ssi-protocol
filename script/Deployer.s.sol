@@ -28,19 +28,29 @@ contract DeployerScript is Script {
         Swap swap = new Swap(owner, chain);
         AssetToken tokenImpl = new AssetToken();
         AssetFactory factoryImpl = new AssetFactory();
-        address factoryAddress = address(new TransparentUpgradeableProxy(
+        address factory = address(new TransparentUpgradeableProxy(
             address(factoryImpl),
             owner,
             abi.encodeCall(AssetFactory.initialize, (owner, address(swap), vault, chain, address(tokenImpl)))
         ));
-        AssetFactory factory = AssetFactory(factoryAddress);
         AssetIssuer issuer = new AssetIssuer(owner, address(factory));
         AssetRebalancer rebalancer = new AssetRebalancer(owner, address(factory));
         AssetFeeManager feeManager = new AssetFeeManager(owner, address(factory));
-        StakeFactory stakeFactory = new StakeFactory(owner, address(factory));
+        // staking contracts
+        StakeToken stakeTokenImpl = new StakeToken();
+        StakeFactory stakeFactoryImpl = new StakeFactory();
+        address stakeFactory = address(new TransparentUpgradeableProxy(
+            address(stakeFactoryImpl),
+            owner,
+            abi.encodeCall(StakeFactory.initialize, (owner, address(factory), address(stakeTokenImpl)))
+        ));
         AssetLocking assetLocking = new AssetLocking(owner);
         USSI uSSI = new USSI(owner, orderSigner, address(factory), redeemToken);
-        StakeToken sUSSI = new StakeToken("Staked USSI", "sUSSI", address(uSSI), 7 days);
+        address sUSSI = address(new TransparentUpgradeableProxy(
+            address(stakeTokenImpl),
+            owner,
+            abi.encodeCall(StakeToken.initialize, ("Staked USSI", "sUSSI", address(uSSI), 7 days))
+        ));
         vm.stopBroadcast();
         console.log(string.concat("swap=", vm.toString(address(swap))));
         console.log(string.concat("factory=", vm.toString(address(factory))));

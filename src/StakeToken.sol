@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.25;
 import './Interface.sol';
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "forge-std/console.sol";
 
-contract StakeToken is ERC20 {
+contract StakeToken is Initializable, ERC20Upgradeable {
     using SafeERC20 for IERC20;
 
     address public token;
@@ -23,20 +24,21 @@ contract StakeToken is ERC20 {
     event UnStake(address unstaker, uint256 amount);
     event Withdraw(address withdrawer, uint256 amount);
 
-    constructor(
+    function initialize(
         string memory name_,
         string memory symbol_,
         address token_,
         uint48 cooldown_
-    ) ERC20(name_, symbol_) {
+    ) public initializer {
+        __ERC20_init(name_, symbol_);
         require(token_ != address(0), "token address is zero");
         require(cooldown_ < MAX_COOLDOWN, "cooldown exceeds MAX_COOLDOWN");
         token = token_;
         cooldown = cooldown_;
     }
 
-    function decimals() public view override(ERC20) returns (uint8) {
-        return ERC20(token).decimals();
+    function decimals() public view override(ERC20Upgradeable) returns (uint8) {
+        return ERC20Upgradeable(token).decimals();
     }
 
     function stake(uint256 amount) external {

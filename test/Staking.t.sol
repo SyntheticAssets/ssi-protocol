@@ -70,7 +70,14 @@ contract StakingTest is Test {
         issuer = new AssetIssuer(owner, address(factory));
         address assetTokenAddress = factory.createAssetToken(getAsset(), 10000, address(issuer), rebalancer, feeManager);
         assetToken = AssetToken(assetTokenAddress);
-        stakeFactory = new StakeFactory(owner, address(factory));
+        StakeToken stakeTokenImpl = new StakeToken();
+        StakeFactory stakeFactoryImpl = new StakeFactory();
+        address stakeFactoryAddress = address(new TransparentUpgradeableProxy(
+            address(stakeFactoryImpl),
+            owner,
+            abi.encodeCall(StakeFactory.initialize, (owner, address(factory), address(stakeTokenImpl)))
+        ));
+        stakeFactory = StakeFactory(stakeFactoryAddress);
         assetLocking = new AssetLocking(owner);
         uSSI = new USSI(owner, orderSigner, address(factory), address(WBTC));
         vm.stopPrank();
