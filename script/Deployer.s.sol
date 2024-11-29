@@ -44,8 +44,16 @@ contract DeployerScript is Script {
             owner,
             abi.encodeCall(StakeFactory.initialize, (owner, address(factory), address(stakeTokenImpl)))
         ));
-        AssetLocking assetLocking = new AssetLocking(owner);
-        USSI uSSI = new USSI(owner, orderSigner, address(factory), redeemToken);
+        address assetLocking = address(new TransparentUpgradeableProxy(
+            address(new AssetLocking()),
+            owner,
+            abi.encodeCall(AssetLocking.initialize, owner)
+        ));
+        address uSSI = address(new TransparentUpgradeableProxy(
+            address(new USSI()),
+            owner,
+            abi.encodeCall(USSI.initialize, (owner, orderSigner, address(factory), redeemToken))
+        ));
         address sUSSI = address(new TransparentUpgradeableProxy(
             address(stakeTokenImpl),
             owner,

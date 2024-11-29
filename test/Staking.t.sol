@@ -78,8 +78,16 @@ contract StakingTest is Test {
             abi.encodeCall(StakeFactory.initialize, (owner, address(factory), address(stakeTokenImpl)))
         ));
         stakeFactory = StakeFactory(stakeFactoryAddress);
-        assetLocking = new AssetLocking(owner);
-        uSSI = new USSI(owner, orderSigner, address(factory), address(WBTC));
+        assetLocking = AssetLocking(address(new TransparentUpgradeableProxy(
+            address(new AssetLocking()),
+            owner,
+            abi.encodeCall(AssetLocking.initialize, owner)
+        )));
+        uSSI = USSI(address(new TransparentUpgradeableProxy(
+            address(new USSI()),
+            owner,
+            abi.encodeCall(USSI.initialize, (owner, orderSigner, address(factory), address(WBTC)))
+        )));
         vm.stopPrank();
         vm.startPrank(address(issuer));
         assetToken.mint(staker, stakeAmount);
