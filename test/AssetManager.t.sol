@@ -9,6 +9,9 @@ import "../src/AssetRebalancer.sol";
 import "../src/AssetFeeManager.sol";
 import "../src/AssetFactory.sol";
 
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+
+
 import {Test, console} from "forge-std/Test.sol";
 
 contract FundManagerTest is Test {
@@ -24,11 +27,19 @@ contract FundManagerTest is Test {
     AssetRebalancer rebalancer;
     AssetFeeManager feeManager;
     AssetFactory factory;
+    AssetToken tokenImpl;
+    AssetFactory factoryImpl;
 
     function setUp() public {
         vm.startPrank(owner);
         swap = new Swap(owner, "SETH");
-        factory = new AssetFactory(owner, address(swap), vault, "SETH");
+        tokenImpl = new AssetToken();
+        factoryImpl = new AssetFactory();
+        address factoryAddress = address(new ERC1967Proxy(
+            address(factoryImpl),
+            abi.encodeCall(AssetFactory.initialize, (owner, address(swap), vault, "SETH", address(tokenImpl)))
+        ));
+        factory = AssetFactory(factoryAddress);
         issuer = new AssetIssuer(owner, address(factory));
         rebalancer = new AssetRebalancer(owner, address(factory));
         feeManager = new AssetFeeManager(owner, address(factory));

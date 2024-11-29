@@ -10,6 +10,7 @@ import "../src/StakeFactory.sol";
 import "../src/AssetLocking.sol";
 import "../src/USSI.sol";
 
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import {Test, console} from "forge-std/Test.sol";
 
@@ -59,13 +60,31 @@ contract StakingTest is Test {
 
     function setUp() public {
         vm.startPrank(owner);
-        factory = new AssetFactory(owner, swap, vault, "SETH");
+        AssetToken tokenImpl = new AssetToken();
+        AssetFactory factoryImpl = new AssetFactory();
+        address factoryAddress = address(new ERC1967Proxy(
+            address(factoryImpl),
+            abi.encodeCall(AssetFactory.initialize, (owner, swap, vault, "SETH", address(tokenImpl)))
+        ));
+        factory = AssetFactory(factoryAddress);
         issuer = new AssetIssuer(owner, address(factory));
         address assetTokenAddress = factory.createAssetToken(getAsset(), 10000, address(issuer), rebalancer, feeManager);
         assetToken = AssetToken(assetTokenAddress);
-        stakeFactory = new StakeFactory(owner, address(factory));
-        assetLocking = new AssetLocking(owner);
-        uSSI = new USSI(owner, orderSigner, address(factory), address(WBTC));
+        StakeToken stakeTokenImpl = new StakeToken();
+        StakeFactory stakeFactoryImpl = new StakeFactory();
+        address stakeFactoryAddress = address(new ERC1967Proxy(
+            address(stakeFactoryImpl),
+            abi.encodeCall(StakeFactory.initialize, (owner, address(factory), address(stakeTokenImpl)))
+        ));
+        stakeFactory = StakeFactory(stakeFactoryAddress);
+        assetLocking = AssetLocking(address(new ERC1967Proxy(
+            address(new AssetLocking()),
+            abi.encodeCall(AssetLocking.initialize, owner)
+        )));
+        uSSI = USSI(address(new ERC1967Proxy(
+            address(new USSI()),
+            abi.encodeCall(USSI.initialize, (owner, orderSigner, address(factory), address(WBTC)))
+        )));
         vm.stopPrank();
         vm.startPrank(address(issuer));
         assetToken.mint(staker, stakeAmount);

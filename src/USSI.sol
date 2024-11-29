@@ -2,16 +2,20 @@
 pragma solidity ^0.8.25;
 import './Interface.sol';
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "forge-std/console.sol";
 
-contract USSI is Ownable, AccessControlEnumerable, ERC20 {
+contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ERC20Upgradeable, UUPSUpgradeable {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using EnumerableSet for EnumerableSet.UintSet;
     using SafeERC20 for IERC20;
@@ -54,7 +58,11 @@ contract USSI is Ownable, AccessControlEnumerable, ERC20 {
     event RejectRedeem(bytes32 orderHash);
     event ConfirmRedeem(bytes32 orderHash);
 
-    constructor(address owner, address orderSigner_, address factoryAddress_, address redeemToken_) Ownable(owner) ERC20("USSI", "USSI") {
+    function initialize(address owner, address orderSigner_, address factoryAddress_, address redeemToken_) public initializer {
+        __Ownable_init(owner);
+        __AccessControl_init();
+        __ERC20_init("USSI", "USSI");
+        __UUPSUpgradeable_init();
         require(factoryAddress_ != address(0), "zero factory address");
         require(redeemToken_ != address(0), "zero redeem token address");
         require(orderSigner_ != address(0), "zero order signer address");
@@ -64,7 +72,9 @@ contract USSI is Ownable, AccessControlEnumerable, ERC20 {
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
     }
 
-    function decimals() public pure override(ERC20) returns (uint8) {
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    function decimals() public pure override(ERC20Upgradeable) returns (uint8) {
         return 8;
     }
 
