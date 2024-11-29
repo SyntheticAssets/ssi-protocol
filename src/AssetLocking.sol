@@ -6,9 +6,10 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "forge-std/console.sol";
 
-contract AssetLocking is Initializable, OwnableUpgradeable {
+contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using SafeERC20 for IERC20;
 
@@ -20,7 +21,10 @@ contract AssetLocking is Initializable, OwnableUpgradeable {
 
     function initialize(address owner) public initializer {
         __Ownable_init(owner);
+        __UUPSUpgradeable_init();
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     uint48 public constant MAX_COOLDOWN = 90 days;
 

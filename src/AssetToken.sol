@@ -4,11 +4,12 @@ import "./Interface.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {Utils} from './Utils.sol';
 
 import "forge-std/console.sol";
 
-contract AssetToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, IAssetToken {
+contract AssetToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, UUPSUpgradeable, IAssetToken {
     // tokenset
     Token[] tokenset_;
     Token[] basket_;
@@ -43,6 +44,7 @@ contract AssetToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable
     ) public initializer {
         __ERC20_init(name_, symbol_);
         __AccessControl_init();
+        __UUPSUpgradeable_init();
         require(maxFee_ < 10**feeDecimals, "maxFee should less than 1");
         id = id_;
         maxFee = maxFee_;
@@ -50,6 +52,8 @@ contract AssetToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable
         lastCollectTimestamp = block.timestamp;
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 
     function decimals() public pure override(ERC20Upgradeable, IAssetToken) returns (uint8) {
         return 8;

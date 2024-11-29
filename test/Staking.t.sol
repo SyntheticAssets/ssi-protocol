@@ -10,6 +10,7 @@ import "../src/StakeFactory.sol";
 import "../src/AssetLocking.sol";
 import "../src/USSI.sol";
 
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import {Test, console} from "forge-std/Test.sol";
 
@@ -61,9 +62,8 @@ contract StakingTest is Test {
         vm.startPrank(owner);
         AssetToken tokenImpl = new AssetToken();
         AssetFactory factoryImpl = new AssetFactory();
-        address factoryAddress = address(new TransparentUpgradeableProxy(
+        address factoryAddress = address(new ERC1967Proxy(
             address(factoryImpl),
-            owner,
             abi.encodeCall(AssetFactory.initialize, (owner, swap, vault, "SETH", address(tokenImpl)))
         ));
         factory = AssetFactory(factoryAddress);
@@ -72,20 +72,17 @@ contract StakingTest is Test {
         assetToken = AssetToken(assetTokenAddress);
         StakeToken stakeTokenImpl = new StakeToken();
         StakeFactory stakeFactoryImpl = new StakeFactory();
-        address stakeFactoryAddress = address(new TransparentUpgradeableProxy(
+        address stakeFactoryAddress = address(new ERC1967Proxy(
             address(stakeFactoryImpl),
-            owner,
             abi.encodeCall(StakeFactory.initialize, (owner, address(factory), address(stakeTokenImpl)))
         ));
         stakeFactory = StakeFactory(stakeFactoryAddress);
-        assetLocking = AssetLocking(address(new TransparentUpgradeableProxy(
+        assetLocking = AssetLocking(address(new ERC1967Proxy(
             address(new AssetLocking()),
-            owner,
             abi.encodeCall(AssetLocking.initialize, owner)
         )));
-        uSSI = USSI(address(new TransparentUpgradeableProxy(
+        uSSI = USSI(address(new ERC1967Proxy(
             address(new USSI()),
-            owner,
             abi.encodeCall(USSI.initialize, (owner, orderSigner, address(factory), address(WBTC)))
         )));
         vm.stopPrank();

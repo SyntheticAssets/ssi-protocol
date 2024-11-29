@@ -4,9 +4,11 @@ import './Interface.sol';
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "forge-std/console.sol";
 
-contract StakeToken is Initializable, ERC20Upgradeable {
+contract StakeToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
     using SafeERC20 for IERC20;
 
     address public token;
@@ -28,14 +30,20 @@ contract StakeToken is Initializable, ERC20Upgradeable {
         string memory name_,
         string memory symbol_,
         address token_,
-        uint48 cooldown_
+        uint48 cooldown_,
+        address owner_
     ) public initializer {
         __ERC20_init(name_, symbol_);
+        __Ownable_init(owner_);
+        __UUPSUpgradeable_init();
         require(token_ != address(0), "token address is zero");
         require(cooldown_ < MAX_COOLDOWN, "cooldown exceeds MAX_COOLDOWN");
         token = token_;
         cooldown = cooldown_;
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
 
     function decimals() public view override(ERC20Upgradeable) returns (uint8) {
         return ERC20Upgradeable(token).decimals();

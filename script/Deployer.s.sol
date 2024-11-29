@@ -12,8 +12,7 @@ import {StakeFactory} from "../src/StakeFactory.sol";
 import {StakeToken} from "../src/StakeToken.sol";
 import {AssetLocking} from "../src/AssetLocking.sol";
 import {USSI} from "../src/USSI.sol";
-
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeployerScript is Script {
     function setUp() public {}
@@ -28,9 +27,8 @@ contract DeployerScript is Script {
         Swap swap = new Swap(owner, chain);
         AssetToken tokenImpl = new AssetToken();
         AssetFactory factoryImpl = new AssetFactory();
-        address factory = address(new TransparentUpgradeableProxy(
+        address factory = address(new ERC1967Proxy(
             address(factoryImpl),
-            owner,
             abi.encodeCall(AssetFactory.initialize, (owner, address(swap), vault, chain, address(tokenImpl)))
         ));
         AssetIssuer issuer = new AssetIssuer(owner, address(factory));
@@ -39,25 +37,21 @@ contract DeployerScript is Script {
         // staking contracts
         StakeToken stakeTokenImpl = new StakeToken();
         StakeFactory stakeFactoryImpl = new StakeFactory();
-        address stakeFactory = address(new TransparentUpgradeableProxy(
+        address stakeFactory = address(new ERC1967Proxy(
             address(stakeFactoryImpl),
-            owner,
             abi.encodeCall(StakeFactory.initialize, (owner, address(factory), address(stakeTokenImpl)))
         ));
-        address assetLocking = address(new TransparentUpgradeableProxy(
+        address assetLocking = address(new ERC1967Proxy(
             address(new AssetLocking()),
-            owner,
             abi.encodeCall(AssetLocking.initialize, owner)
         ));
-        address uSSI = address(new TransparentUpgradeableProxy(
+        address uSSI = address(new ERC1967Proxy(
             address(new USSI()),
-            owner,
             abi.encodeCall(USSI.initialize, (owner, orderSigner, address(factory), redeemToken))
         ));
-        address sUSSI = address(new TransparentUpgradeableProxy(
+        address sUSSI = address(new ERC1967Proxy(
             address(stakeTokenImpl),
-            owner,
-            abi.encodeCall(StakeToken.initialize, ("Staked USSI", "sUSSI", address(uSSI), 7 days))
+            abi.encodeCall(StakeToken.initialize, ("Staked USSI", "sUSSI", address(uSSI), 7 days, owner))
         ));
         vm.stopBroadcast();
         console.log(string.concat("swap=", vm.toString(address(swap))));

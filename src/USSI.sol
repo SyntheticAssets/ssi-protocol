@@ -11,10 +11,11 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "forge-std/console.sol";
 
-contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ERC20Upgradeable {
+contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ERC20Upgradeable, UUPSUpgradeable {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using EnumerableSet for EnumerableSet.UintSet;
     using SafeERC20 for IERC20;
@@ -61,6 +62,7 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         __Ownable_init(owner);
         __AccessControl_init();
         __ERC20_init("USSI", "USSI");
+        __UUPSUpgradeable_init();
         require(factoryAddress_ != address(0), "zero factory address");
         require(redeemToken_ != address(0), "zero redeem token address");
         require(orderSigner_ != address(0), "zero order signer address");
@@ -69,6 +71,8 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         orderSigner = orderSigner_;
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function decimals() public pure override(ERC20Upgradeable) returns (uint8) {
         return 8;

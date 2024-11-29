@@ -5,13 +5,14 @@ import "./AssetToken.sol";
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "forge-std/console.sol";
 
-contract AssetFactory is Initializable, OwnableUpgradeable, IAssetFactory {
+contract AssetFactory is Initializable, OwnableUpgradeable, UUPSUpgradeable, IAssetFactory {
     using EnumerableSet for EnumerableSet.UintSet;
     EnumerableSet.UintSet assetIDs;
     mapping(uint => address) public assetTokens;
@@ -36,6 +37,7 @@ contract AssetFactory is Initializable, OwnableUpgradeable, IAssetFactory {
 
     function initialize(address owner, address swap_, address vault_, string memory chain_, address tokenImpl_) public initializer {
         __Ownable_init(owner);
+        __UUPSUpgradeable_init();
         require(swap_ != address(0), "swap address is zero");
         require(vault_ != address(0), "vault address is zero");
         require(tokenImpl_ != address(0), "token impl address is zero");
@@ -47,6 +49,8 @@ contract AssetFactory is Initializable, OwnableUpgradeable, IAssetFactory {
         emit SetSwap(swap);
         emit SetTokenImpl(tokenImpl);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function setSwap(address swap_) external onlyOwner {
         require(swap_ != address(0), "swap address is zero");
@@ -67,7 +71,7 @@ contract AssetFactory is Initializable, OwnableUpgradeable, IAssetFactory {
         emit SetTokenImpl(tokenImpl);
         for (uint i = 0; i < assetIDs.length(); i++) {
             address assetToken = assetTokens[assetIDs.at(i)];
-            ITransparentUpgradeableProxy(assetToken).upgradeToAndCall(tokenImpl, new bytes(0));
+            UUPSUpgradeable(assetToken).upgradeToAndCall(tokenImpl, new bytes(0));
             emit UpgradeAssetToken(assetIDs.at(i), tokenImpl);
         }
     }
@@ -75,9 +79,8 @@ contract AssetFactory is Initializable, OwnableUpgradeable, IAssetFactory {
     function createAssetToken(Asset memory asset, uint maxFee, address issuer, address rebalancer, address feeManager) external onlyOwner returns (address) {
         require(issuer != address(0) && rebalancer != address(0) && feeManager != address(0), "controllers not set");
         require(!assetIDs.contains(asset.id), "asset exists");
-        address assetTokenAddress = address(new TransparentUpgradeableProxy(
+        address assetTokenAddress = address(new ERC1967Proxy(
             tokenImpl,
-            address(this),
             abi.encodeCall(AssetToken.initialize, (asset.id, asset.name, asset.symbol, maxFee, address(this)))
         ));
         IAssetToken assetToken = IAssetToken(assetTokenAddress);

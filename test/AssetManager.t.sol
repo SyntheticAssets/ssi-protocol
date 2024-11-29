@@ -9,6 +9,8 @@ import "../src/AssetRebalancer.sol";
 import "../src/AssetFeeManager.sol";
 import "../src/AssetFactory.sol";
 
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+
 
 import {Test, console} from "forge-std/Test.sol";
 
@@ -33,9 +35,8 @@ contract FundManagerTest is Test {
         swap = new Swap(owner, "SETH");
         tokenImpl = new AssetToken();
         factoryImpl = new AssetFactory();
-        address factoryAddress = address(new TransparentUpgradeableProxy(
+        address factoryAddress = address(new ERC1967Proxy(
             address(factoryImpl),
-            owner,
             abi.encodeCall(AssetFactory.initialize, (owner, address(swap), vault, "SETH", address(tokenImpl)))
         ));
         factory = AssetFactory(factoryAddress);

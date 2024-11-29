@@ -7,10 +7,12 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import './StakeToken.sol';
 import "forge-std/console.sol";
 
-contract StakeFactory is Initializable, OwnableUpgradeable {
+contract StakeFactory is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     using EnumerableSet for EnumerableSet.UintSet;
     address public factoryAddress;
     mapping(uint256 => address) public stakeTokens;
@@ -23,9 +25,12 @@ contract StakeFactory is Initializable, OwnableUpgradeable {
 
     function initialize(address owner, address factoryAddress_, address stImpl_) public initializer {
         __Ownable_init(owner);
+        __UUPSUpgradeable_init();
         factoryAddress = factoryAddress_;
         _setSTImpl(stImpl_);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function setSTImpl(address stImpl_) external onlyOwner {
         _setSTImpl(stImpl_);
@@ -36,7 +41,7 @@ contract StakeFactory is Initializable, OwnableUpgradeable {
         require(stImpl_ != stImpl, "stImpl not change");
         for (uint i = 0; i < assetIDs.length(); i++) {
             address stakeToken = stakeTokens[assetIDs.at(i)];
-            ITransparentUpgradeableProxy(stakeToken).upgradeToAndCall(stImpl_, new bytes(0));
+            UUPSUpgradeable(stakeToken).upgradeToAndCall(stImpl_, new bytes(0));
             emit UpgradeStakeToken(assetIDs.at(i), stImpl, stImpl_);
         }
         emit SetSTImpl(stImpl, stImpl_);
@@ -50,14 +55,14 @@ contract StakeFactory is Initializable, OwnableUpgradeable {
         require(assetToken != address(0), "asset token not exists");
         string memory tokenName = IERC20Metadata(assetToken).name();
         string memory tokenSymbol = IERC20Metadata(assetToken).symbol();
-        stakeToken = address(new TransparentUpgradeableProxy(
+        stakeToken = address(new ERC1967Proxy(
             stImpl,
-            address(this),
             abi.encodeCall(StakeToken.initialize, (
                 string.concat("Staked ", tokenName),
                 string.concat("s", tokenSymbol),
                 address(assetToken),
-                cooldown
+                cooldown,
+                address(this)
             ))
         ));
         stakeTokens[assetID] = stakeToken;
