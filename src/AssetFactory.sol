@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.25;
 import "./Interface.sol";
+import "./AssetToken.sol";
+
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {AssetToken} from "./AssetToken.sol";
-import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 
-import {Options} from "../lib/openzeppelin-foundry-upgrades/src/Options.sol";
+import "forge-std/console.sol";
 
-contract AssetFactory is Initializable, OwnableUpgradeable {
+contract AssetFactory is Initializable, OwnableUpgradeable, IAssetFactory {
     using EnumerableSet for EnumerableSet.UintSet;
-
-    EnumerableSet.UintSet private assetIDs;
+    EnumerableSet.UintSet assetIDs;
     mapping(uint => address) public assetTokens;
 
     mapping(uint => address) public issuers;
@@ -22,146 +23,114 @@ contract AssetFactory is Initializable, OwnableUpgradeable {
     address public swap;
     address public vault;
     string public chain;
+    address public tokenImpl;
 
-    event AssetTokenCreated(address indexed assetTokenAddress);
-    event SetVault(address indexed vault);
-    event SetSwap(address indexed swap);
-    event UpgradeAssetToken(
-        uint indexed assetID,
-        address indexed newImplementation
-    );
+    event AssetTokenCreated(address assetTokenAddress);
+    event SetVault(address vault);
+    event SetSwap(address swap);
+    event SetTokenImpl(address tokenImpl);
+    event UpgradeAssetToken(uint256 assetID, address tokenImpl);
+    event SetIssuer(uint256 assetID, address oldIssuer, address issuer);
+    event SetRebalancer(uint256 assetID, address oldRebalancer, address rebalancer);
+    event SetFeeManager(uint256 assetID, address oldFeeManager, address feeManager);
 
-    /**
-     * @dev 初始化函数，代替构造函数
-     */
-    function initialize(
-        address owner,
-        address swap_,
-        address vault_,
-        string memory chain_
-    ) public initializer {
-        __Ownable_init(msg.sender);
-        require(swap_ != address(0), "Swap address is zero");
-        require(vault_ != address(0), "Vault address is zero");
+    function initialize(address owner, address swap_, address vault_, string memory chain_, address tokenImpl_) public initializer {
+        __Ownable_init(owner);
+        require(swap_ != address(0), "swap address is zero");
+        require(vault_ != address(0), "vault address is zero");
+        require(tokenImpl_ != address(0), "token impl address is zero");
         swap = swap_;
         vault = vault_;
         chain = chain_;
-        transferOwnership(owner);
+        tokenImpl = tokenImpl_;
         emit SetVault(vault);
         emit SetSwap(swap);
+        emit SetTokenImpl(tokenImpl);
     }
 
-    /**
-     * @dev 设置 Swap 地址
-     */
     function setSwap(address swap_) external onlyOwner {
-        require(swap_ != address(0), "Swap address is zero");
+        require(swap_ != address(0), "swap address is zero");
         swap = swap_;
         emit SetSwap(swap);
     }
 
-    /**
-     * @dev 设置 Vault 地址
-     */
     function setVault(address vault_) external onlyOwner {
-        require(vault_ != address(0), "Vault address is zero");
+        require(vault_ != address(0), "vault address is zero");
         vault = vault_;
         emit SetVault(vault);
     }
 
-    function createAssetToken(
-        Asset memory asset,
-        uint maxFee,
-        address issuer,
-        address rebalancer,
-        address feeManager
-    ) external onlyOwner returns (address) {
-        require(
-            issuer != address(0) &&
-                rebalancer != address(0) &&
-                feeManager != address(0),
-            "Controllers not set"
-        );
-        require(!assetIDs.contains(asset.id), "Asset exists");
+    function setTokenImpl(address tokenImpl_) external onlyOwner {
+        require(tokenImpl_ != address(0), "token impl address is zero");
+        require(tokenImpl_ != tokenImpl, "token impl is not change");
+        tokenImpl = tokenImpl_;
+        emit SetTokenImpl(tokenImpl);
+        for (uint i = 0; i < assetIDs.length(); i++) {
+            address assetToken = assetTokens[assetIDs.at(i)];
+            ITransparentUpgradeableProxy(assetToken).upgradeToAndCall(tokenImpl, new bytes(0));
+            emit UpgradeAssetToken(assetIDs.at(i), tokenImpl);
+        }
+    }
 
-        Options memory options;
-        options.unsafeSkipProxyAdminCheck = true;
-        address assetTokenProxy = Upgrades.deployTransparentProxy(
-            "AssetToken.sol",
+    function createAssetToken(Asset memory asset, uint maxFee, address issuer, address rebalancer, address feeManager) external onlyOwner returns (address) {
+        require(issuer != address(0) && rebalancer != address(0) && feeManager != address(0), "controllers not set");
+        require(!assetIDs.contains(asset.id), "asset exists");
+        address assetTokenAddress = address(new TransparentUpgradeableProxy(
+            tokenImpl,
             address(this),
-            abi.encodeCall(
-                AssetToken.initialize,
-                (asset.id, asset.name, asset.symbol, maxFee, address(this))
-            ),
-            options
-        );
-
-        // 配置角色和初始状态
-        AssetToken assetToken = AssetToken(assetTokenProxy);
+            abi.encodeCall(AssetToken.initialize, (asset.id, asset.name, asset.symbol, maxFee, address(this)))
+        ));
+        IAssetToken assetToken = IAssetToken(assetTokenAddress);
         assetToken.grantRole(assetToken.ISSUER_ROLE(), issuer);
         assetToken.grantRole(assetToken.REBALANCER_ROLE(), rebalancer);
         assetToken.grantRole(assetToken.FEEMANAGER_ROLE(), feeManager);
         assetToken.initTokenset(asset.tokenset);
-
         assetTokens[asset.id] = address(assetToken);
         issuers[asset.id] = issuer;
         rebalancers[asset.id] = rebalancer;
         feeManagers[asset.id] = feeManager;
         assetIDs.add(asset.id);
-
         emit AssetTokenCreated(address(assetToken));
         return address(assetToken);
     }
 
-    /**
-     * @dev 检查资产 ID 是否存在
-     */
+    function setIssuer(uint256 assetID, address issuer) external onlyOwner {
+        require(issuer != address(0), "issuer is zero address");
+        require(assetIDs.contains(assetID), "assetID not exists");
+        IAssetToken assetToken = IAssetToken(assetTokens[assetID]);
+        require(!assetToken.issuing(), "is issuing");
+        address oldIssuer = issuers[assetID];
+        assetToken.revokeRole(assetToken.ISSUER_ROLE(), oldIssuer);
+        assetToken.grantRole(assetToken.ISSUER_ROLE(), issuer);
+        emit SetIssuer(assetID, oldIssuer, issuer);
+    }
+
+    function setRebalancer(uint256 assetID, address rebalancer) external onlyOwner {
+        require(rebalancer != address(0), "rebalancer is zero address");
+        require(assetIDs.contains(assetID), "assetID not exists");
+        IAssetToken assetToken = IAssetToken(assetTokens[assetID]);
+        require(!assetToken.rebalancing(), "is rebalancing");
+        address oldRebalancer = rebalancers[assetID];
+        assetToken.revokeRole(assetToken.REBALANCER_ROLE(), oldRebalancer);
+        assetToken.grantRole(assetToken.REBALANCER_ROLE(), rebalancer);
+        emit SetRebalancer(assetID, oldRebalancer, rebalancer);
+    }
+
+    function setFeeManager(uint256 assetID, address feeManager) external onlyOwner {
+        require(feeManager != address(0), "feeManager is zero address");
+        require(assetIDs.contains(assetID), "assetID not exists");
+        IAssetToken assetToken = IAssetToken(assetTokens[assetID]);
+        address oldFeeManager = feeManagers[assetID];
+        assetToken.revokeRole(assetToken.FEEMANAGER_ROLE(), oldFeeManager);
+        assetToken.grantRole(assetToken.FEEMANAGER_ROLE(), feeManager);
+        emit SetFeeManager(assetID, oldFeeManager, feeManager);
+    }
+
     function hasAssetID(uint assetID) external view returns (bool) {
         return assetIDs.contains(assetID);
     }
 
-    /**
-     * @dev 获取所有资产 ID
-     */
     function getAssetIDs() external view returns (uint[] memory) {
         return assetIDs.values();
-    }
-
-    function upgradeAssetToken(
-        uint assetID,
-        string memory newImpName
-    )
-        external
-        onlyOwner
-        returns (
-            address oldImplementation,
-            address newImplementation,
-            address oldProxyAdmin,
-            address newProxyAdmin
-        )
-    {
-        address proxy = assetTokens[assetID];
-        oldImplementation = Upgrades.getImplementationAddress(proxy);
-        oldProxyAdmin = Upgrades.getAdminAddress(proxy);
-
-        Options memory assettokenOptions;
-        assettokenOptions.unsafeSkipStorageCheck = true;
-
-        Upgrades.upgradeProxy(
-            proxy,
-            newImpName,
-            new bytes(0),
-            assettokenOptions
-        );
-        newImplementation = Upgrades.getImplementationAddress(proxy);
-        newProxyAdmin = Upgrades.getAdminAddress(proxy);
-
-        emit UpgradeAssetToken(assetID, newImplementation);
-        return (
-            oldImplementation,
-            newImplementation,
-            oldProxyAdmin,
-            newProxyAdmin
-        );
     }
 }

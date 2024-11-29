@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.25;
+
 import {Script, console} from "forge-std/Script.sol";
-import {Upgrades} from "../lib/openzeppelin-foundry-upgrades/src/Upgrades.sol";
 import {Swap} from "../src/Swap.sol";
+import {AssetToken} from "../src/AssetToken.sol";
 import {AssetFactory} from "../src/AssetFactory.sol";
 import {AssetIssuer} from "../src/AssetIssuer.sol";
 import {AssetRebalancer} from "../src/AssetRebalancer.sol";
@@ -12,7 +13,9 @@ import {StakeToken} from "../src/StakeToken.sol";
 import {AssetLocking} from "../src/AssetLocking.sol";
 import {USSI} from "../src/USSI.sol";
 
-contract DeployAssetController is Script {
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
+contract DeployerScript is Script {
     function setUp() public {}
 
     function run() public {
@@ -22,12 +25,18 @@ contract DeployAssetController is Script {
         address redeemToken = vm.envAddress("REDEEM_TOKEN");
         string memory chain = vm.envString("CHAIN_CODE");
         vm.startBroadcast();
-        address swap = Upgrades.deployTransparentProxy("Swap.sol", owner, abi.encodeCall(Swap.initialize, (owner, chain)));
-        address factory = Upgrades.deployTransparentProxy("AssetFactory.sol", owner, abi.encodeCall(AssetFactory.initialize, (owner, swap, vault, chain)));
-        address issuer = Upgrades.deployTransparentProxy("AssetIssuer.sol", owner, abi.encodeCall(AssetIssuer.initialize, (owner, factory)));
-        address rebalancer = Upgrades.deployTransparentProxy("AssetRebalancer.sol", owner, abi.encodeCall(AssetRebalancer.initialize, (owner, factory)));
-        address feeManager = Upgrades.deployTransparentProxy("AssetFeeManager.sol", owner, abi.encodeCall(AssetFeeManager.initialize, (owner, factory)));
-        vm.stopBroadcast();
+        Swap swap = new Swap(owner, chain);
+        AssetToken tokenImpl = new AssetToken();
+        AssetFactory factoryImpl = new AssetFactory();
+        address factoryAddress = address(new TransparentUpgradeableProxy(
+            address(factoryImpl),
+            owner,
+            abi.encodeCall(AssetFactory.initialize, (owner, address(swap), vault, chain, address(tokenImpl)))
+        ));
+        AssetFactory factory = AssetFactory(factoryAddress);
+        AssetIssuer issuer = new AssetIssuer(owner, address(factory));
+        AssetRebalancer rebalancer = new AssetRebalancer(owner, address(factory));
+        AssetFeeManager feeManager = new AssetFeeManager(owner, address(factory));
         StakeFactory stakeFactory = new StakeFactory(owner, address(factory));
         AssetLocking assetLocking = new AssetLocking(owner);
         USSI uSSI = new USSI(owner, orderSigner, address(factory), redeemToken);

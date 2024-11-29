@@ -1,51 +1,40 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.25;
-
 import "./Interface.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {Utils} from "./Utils.sol";
+import {Utils} from './Utils.sol';
 
-contract AssetToken is
-    Initializable,
-    ERC20Upgradeable,
-    AccessControlUpgradeable,
-    IAssetToken
-{
-    // State Variables
-    Token[] private tokenset_;
-    Token[] private basket_;
-    Token[] private feeTokenset_;
-    uint private issueCnt;
+import "forge-std/console.sol";
+
+contract AssetToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable, IAssetToken {
+    // tokenset
+    Token[] tokenset_;
+    Token[] basket_;
+    Token[] feeTokenset_;
+    // issue
+    uint issueCnt;
+    // rebalance
     bool public rebalancing;
+    // fee
     uint public constant feeDecimals = 8;
     uint public id;
     uint public maxFee;
     uint public fee;
     uint public lastCollectTimestamp;
     bool public burningFee;
-
-    // Roles
+    // roles
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
     bytes32 public constant REBALANCER_ROLE = keccak256("REBALANCER_ROLE");
     bytes32 public constant FEEMANAGER_ROLE = keccak256("FEEMANAGER_ROLE");
-
-    // Events
+    // event
     event SetFee(uint fee);
     event SetTokenset(Token[] tokenset);
     event SetBasket(Token[] basket);
     event SetFeeTokenset(Token[] feeTokenset);
 
-    /**
-     * @dev Initialize function to replace constructor for upgradeable contracts.
-     * @param id_ Asset token ID.
-     * @param name_ Name of the token.
-     * @param symbol_ Symbol of the token.
-     * @param maxFee_ Maximum fee allowed.
-     * @param owner Address of the admin role.
-     */
-    function initialize(
+    function initialize (
         uint256 id_,
         string memory name_,
         string memory symbol_,
@@ -54,20 +43,15 @@ contract AssetToken is
     ) public initializer {
         __ERC20_init(name_, symbol_);
         __AccessControl_init();
-        require(maxFee_ < 10 ** feeDecimals, "maxFee should be less than 1");
+        require(maxFee_ < 10**feeDecimals, "maxFee should less than 1");
         id = id_;
         maxFee = maxFee_;
-        fee = maxFee_;
+        fee = maxFee;
         lastCollectTimestamp = block.timestamp;
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
     }
 
-    function decimals()
-        public
-        pure
-        override(ERC20Upgradeable, IAssetToken)
-        returns (uint8)
-    {
+    function decimals() public pure override(ERC20Upgradeable, IAssetToken) returns (uint8) {
         return 8;
     }
 
@@ -77,9 +61,7 @@ contract AssetToken is
         return tokenset_;
     }
 
-    function initTokenset(
-        Token[] memory tokenset
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function initTokenset(Token[] memory tokenset) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(tokenset_.length == 0, "already inited");
         setTokenset(tokenset);
     }
@@ -125,19 +107,13 @@ contract AssetToken is
 
     function mint(address account, uint amount) external onlyRole(ISSUER_ROLE) {
         _mint(account, amount);
-        Token[] memory newBasket = Utils.addTokenset(
-            basket_,
-            Utils.muldivTokenset(tokenset_, amount, 10 ** decimals())
-        );
+        Token[] memory newBasket = Utils.addTokenset(basket_, Utils.muldivTokenset(tokenset_, amount, 10 ** decimals()));
         setBasket(newBasket);
     }
 
     function burn(uint amount) external onlyRole(ISSUER_ROLE) {
         _update(msg.sender, address(0), amount);
-        Token[] memory newBasket = Utils.subTokenset(
-            basket_,
-            Utils.muldivTokenset(tokenset_, amount, 10 ** decimals())
-        );
+        Token[] memory newBasket = Utils.subTokenset(basket_, Utils.muldivTokenset(tokenset_, amount, 10 ** decimals()));
         setBasket(newBasket);
     }
 
@@ -153,21 +129,11 @@ contract AssetToken is
         rebalancing = false;
     }
 
-    function rebalance(
-        Token[] memory inBasket,
-        Token[] memory outBasket
-    ) external onlyRole(REBALANCER_ROLE) {
+    function rebalance(Token[] memory inBasket, Token[] memory outBasket) external onlyRole(REBALANCER_ROLE) {
         require(rebalancing, "lock rebalance first");
         require(totalSupply() > 0, "zero supply");
-        Token[] memory newBasket = Utils.addTokenset(
-            Utils.subTokenset(basket_, outBasket),
-            inBasket
-        );
-        Token[] memory newTokenset = Utils.muldivTokenset(
-            newBasket,
-            10 ** decimals(),
-            totalSupply()
-        );
+        Token[] memory newBasket = Utils.addTokenset(Utils.subTokenset(basket_, outBasket), inBasket);
+        Token[] memory newTokenset = Utils.muldivTokenset(newBasket, 10**decimals(), totalSupply());
         setBasket(newBasket);
         setTokenset(newTokenset);
     }
@@ -195,31 +161,19 @@ contract AssetToken is
                 require(rebalancing == false, "is rebalancing");
                 require(issueCnt == 0, "is issuing");
                 Token[] memory newBasket = basket_;
-                uint256 feeDays = (block.timestamp - lastCollectTimestamp) /
-                    1 days;
+                uint256 feeDays = (block.timestamp - lastCollectTimestamp) / 1 days;
                 for (uint i = 0; i < newBasket.length; i++) {
                     for (uint j = 0; j < feeDays; j++) {
-                        newBasket[i].amount -=
-                            (newBasket[i].amount * fee) /
-                            (10 ** feeDecimals);
+                        newBasket[i].amount -= newBasket[i].amount * fee / (10 ** feeDecimals);
                     }
                 }
-                Token[] memory newFeeTokenset = Utils.addTokenset(
-                    feeTokenset_,
-                    Utils.subTokenset(basket_, newBasket)
-                );
-                Token[] memory newTokenset = Utils.muldivTokenset(
-                    newBasket,
-                    10 ** decimals(),
-                    totalSupply()
-                );
+                Token[] memory newFeeTokenset = Utils.addTokenset(feeTokenset_, Utils.subTokenset(basket_, newBasket));
+                Token[] memory newTokenset = Utils.muldivTokenset(newBasket, 10**decimals(), totalSupply());
                 setBasket(newBasket);
                 setFeeTokenset(newFeeTokenset);
                 setTokenset(newTokenset);
             }
-            lastCollectTimestamp +=
-                ((block.timestamp - lastCollectTimestamp) / 1 days) *
-                1 days;
+            lastCollectTimestamp += (block.timestamp - lastCollectTimestamp) / 1 days * 1 days;
         }
     }
 
@@ -232,13 +186,8 @@ contract AssetToken is
         burningFee = false;
     }
 
-    function burnFeeTokenset(
-        Token[] memory feeTokenset
-    ) external onlyRole(FEEMANAGER_ROLE) {
-        require(
-            Utils.containTokenset(feeTokenset_, feeTokenset),
-            "burn amount too large"
-        );
+    function burnFeeTokenset(Token[] memory feeTokenset) external onlyRole(FEEMANAGER_ROLE) {
+        require(Utils.containTokenset(feeTokenset_, feeTokenset), "burn amount too large");
         setFeeTokenset(Utils.subTokenset(feeTokenset_, feeTokenset));
     }
 
