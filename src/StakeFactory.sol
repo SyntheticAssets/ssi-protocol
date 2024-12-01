@@ -77,4 +77,14 @@ contract StakeFactory is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             tokens[i] = stakeTokens[assetIDs.at(i)];
         }
     }
+
+    function pauseStakeToken(uint256 assetID) external onlyOwner {
+        require(assetIDs.contains(assetID), "stake token not exists");
+        StakeToken(stakeTokens[assetID]).pause();
+    }
+
+    function unpauseStakeToken(uint256 assetID) external onlyOwner {
+        require(assetIDs.contains(assetID), "stake token not exists");
+        StakeToken(stakeTokens[assetID]).unpause();
+    }
 }

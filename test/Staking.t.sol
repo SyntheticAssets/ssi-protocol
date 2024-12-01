@@ -7,6 +7,7 @@ import "../src/Swap.sol";
 import "../src/AssetFactory.sol";
 import "../src/AssetIssuer.sol";
 import "../src/StakeFactory.sol";
+import "../src/StakeToken.sol";
 import "../src/AssetLocking.sol";
 import "../src/USSI.sol";
 
@@ -96,6 +97,15 @@ contract StakingTest is Test {
         vm.startPrank(owner);
         stakeToken = StakeToken(stakeFactory.createStakeToken(assetToken.id(), 3600*24*7));
         assertEq(stakeToken.token(), address(assetToken));
+        vm.stopPrank();
+        // test pause
+        vm.startPrank(owner);
+        stakeFactory.pauseStakeToken(assetToken.id());
+        vm.stopPrank();
+        vm.expectRevert(PausableUpgradeable.EnforcedPause.selector);
+        stakeToken.stake(stakeAmount);
+        vm.startPrank(owner);
+        stakeFactory.unpauseStakeToken(assetToken.id());
         vm.stopPrank();
         // stake
         vm.startPrank(staker);
