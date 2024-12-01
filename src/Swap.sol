@@ -23,12 +23,15 @@ contract Swap is AccessControl, Pausable, ISwap {
     string[] public takerReceivers;
     string[] public takerSenders;
 
+    uint256 public constant MAX_MARKER_CONFIRM_DELAY = 1 hours;
+
     event AddSwapRequest(address indexed taker, bool inByContract, bool outByContract, OrderInfo orderInfo);
     event MakerConfirmSwapRequest(address indexed maker, bytes32 orderHash);
     event ConfirmSwapRequest(address indexed taker, bytes32 orderHash);
     event MakerRejectSwapRequest(address indexed maker, bytes32 orderHash);
     event RollbackSwapRequest(address indexed taker, bytes32 orderHash);
     event SetTakerAddresses(string[] receivers, string[] senders);
+    event CancelSwapRequest(address indexed taker, bytes32 orderHash);
 
     constructor(address owner, string memory chain_) {
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
@@ -118,11 +121,23 @@ contract Swap is AccessControl, Pausable, ISwap {
         swapRequests[orderInfo.orderHash].inByContract = inByContract;
         swapRequests[orderInfo.orderHash].outByContract = outByContract;
         swapRequests[orderInfo.orderHash].blocknumber = block.number;
+        swapRequests[orderInfo.orderHash].requestTimestamp = block.timestamp;
         emit AddSwapRequest(msg.sender, inByContract, outByContract, orderInfo);
     }
 
     function getSwapRequest(bytes32 orderHash) external view returns (SwapRequest memory) {
         return swapRequests[orderHash];
+    }
+
+    function cancelSwapRequest(OrderInfo memory orderInfo) external onlyRole(TAKER_ROLE) whenNotPaused {
+        validateOrderInfo(orderInfo);
+        bytes32 orderHash = orderInfo.orderHash;
+        require(swapRequests[orderHash].requester == msg.sender, "not order taker");
+        require(swapRequests[orderHash].status == SwapRequestStatus.PENDING, "swap request status is not pending");
+        require(swapRequests[orderHash].requestTimestamp + MAX_MARKER_CONFIRM_DELAY <= block.timestamp, "swap request not timeout");
+        swapRequests[orderHash].status = SwapRequestStatus.CANCEL;
+        swapRequests[orderHash].blocknumber = block.number;
+        emit CancelSwapRequest(msg.sender, orderHash);
     }
 
     function makerRejectSwapRequest(OrderInfo memory orderInfo) external onlyRole(MAKER_ROLE) whenNotPaused {

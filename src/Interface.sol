@@ -43,7 +43,7 @@ struct Range {
     uint256 max;
 }
 
-enum SwapRequestStatus {NONE, PENDING, MAKER_CONFIRMED, CONFIRMED, REJECTED}
+enum SwapRequestStatus {NONE, PENDING, MAKER_CONFIRMED, CONFIRMED, REJECTED, CANCEL}
 
 struct SwapRequest {
     bytes[] inTxHashs;
@@ -53,6 +53,7 @@ struct SwapRequest {
     bool inByContract;
     bool outByContract;
     uint256 blocknumber;
+    uint256 requestTimestamp;
 }
 
 enum RequestStatus {NONE, PENDING, CONFIRMED, REJECTED}
@@ -131,6 +132,7 @@ interface ISwap is IAccessControl {
     function makerConfirmSwapRequest(OrderInfo memory orderInfo, bytes[] memory outTxHashs) external;
     function makerRejectSwapRequest(OrderInfo memory orderInfo) external;
     function rollbackSwapRequest(OrderInfo memory orderInfo) external;
+    function cancelSwapRequest(OrderInfo memory orderInfo) external;
     function confirmSwapRequest(OrderInfo memory orderInfo, bytes[] memory inTxHashs) external;
     function setTakerAddresses(string[] memory takerReceivers_, string[] memory takerSenders_) external;
     function getTakerAddresses() external view returns (string[] memory receivers, string[] memory senders);

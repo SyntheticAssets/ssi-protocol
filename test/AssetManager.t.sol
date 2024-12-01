@@ -696,6 +696,27 @@ contract FundManagerTest is Test {
         assertTrue(swapRequest.status == SwapRequestStatus.PENDING);
     }
 
+    function test_cancel() public {
+        address assetTokenAddress = createAssetToken();
+        OrderInfo memory orderInfo = pmmQuoteMint();
+        IERC20 inToken = IERC20(vm.parseAddress(orderInfo.order.inTokenset[0].addr));
+        (uint nonce, uint amountBeforeMint) = apAddMintRequest(assetTokenAddress, orderInfo);
+        vm.startPrank(owner);
+        vm.expectRevert();
+        issuer.cancelSwapRequest(orderInfo);
+        vm.stopPrank();
+        vm.startPrank(owner);
+        vm.warp(block.timestamp + 1 hours);
+        issuer.cancelSwapRequest(orderInfo);
+        vm.stopPrank();
+        SwapRequest memory swapRequest = swap.getSwapRequest(orderInfo.orderHash);
+        assertTrue(swapRequest.status == SwapRequestStatus.CANCEL);
+        vm.startPrank(owner);
+        issuer.rejectMintRequest(nonce, orderInfo);
+        assertEq(inToken.balanceOf(ap), amountBeforeMint);
+        assertTrue(issuer.getMintRequest(nonce).status == RequestStatus.REJECTED);
+    }
+
     function test_withdraw() public {
         WETH.mint(owner, 10**18);
         vm.startPrank(owner);
