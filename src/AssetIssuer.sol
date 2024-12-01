@@ -133,7 +133,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         require(mintRequest.status == RequestStatus.PENDING);
         ISwap swap = ISwap(mintRequest.swapAddress);
         SwapRequest memory swapRequest = swap.getSwapRequest(mintRequest.orderHash);
-        require(swapRequest.status == SwapRequestStatus.REJECTED);
+        require(swapRequest.status == SwapRequestStatus.REJECTED || swapRequest.status == SwapRequestStatus.CANCEL);
         Order memory order = orderInfo.order;
         Token[] memory inTokenset = order.inTokenset;
         IAssetFactory factory = IAssetFactory(factoryAddress);

@@ -27,4 +27,8 @@ contract AssetController is Ownable, Pausable, IAssetController {
     function rollbackSwapRequest(OrderInfo memory orderInfo) external onlyOwner {
         ISwap(IAssetFactory(factoryAddress).swap()).rollbackSwapRequest(orderInfo);
     }
+
+    function cancelSwapRequest(OrderInfo memory orderInfo) external onlyOwner {
+        ISwap(IAssetFactory(factoryAddress).swap()).cancelSwapRequest(orderInfo);
+    }
 }
