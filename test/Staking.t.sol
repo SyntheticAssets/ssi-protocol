@@ -235,12 +235,13 @@ contract StakingTest is Test {
         // confirm redeem
         vm.startPrank(owner);
         vm.expectRevert();
-        uSSI.confirmRedeem(orderHash);
+        uSSI.confirmRedeem(orderHash, bytes32(0));
         WBTC.mint(owner, stakeAmount);
         WBTC.transfer(address(uSSI), stakeAmount);
-        uSSI.confirmRedeem(orderHash);
+        uSSI.confirmRedeem(orderHash, bytes32(uint256(1)));
         vm.stopPrank();
         assertEq(uSSI.balanceOf(hedger), 0);
-        assertEq(WBTC.balanceOf(hedger), stakeAmount);
+        assertEq(WBTC.balanceOf(address(uSSI)), stakeAmount);
+        assertEq(WBTC.balanceOf(hedger), 0);
     }
 }
