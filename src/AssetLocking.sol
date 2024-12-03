@@ -20,6 +20,11 @@ contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable, Pau
     event UnLock(address locker, address token, uint256 amount);
     event Withdraw(address locker, address token, uint256 amount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address owner) public initializer {
         __Ownable_init(owner);
         __UUPSUpgradeable_init();
@@ -99,9 +104,9 @@ contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable, Pau
         LockConfig storage lockConfig = lockConfigs[token];
         require(lockConfig.totalLock + amount <= lockConfig.lockLimit, "total lock amount exceeds lock limit");
         require(IERC20(token).allowance(msg.sender, address(this)) >= amount, "not enough allowance");
-        IERC20(token).transferFrom(msg.sender, address(this), amount);
         lockData.amount += amount;
         lockConfig.totalLock += amount;
+        IERC20(token).transferFrom(msg.sender, address(this), amount);
         emit Lock(msg.sender, token, amount);
     }
 
@@ -121,11 +126,11 @@ contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable, Pau
         LockData storage lockData = lockDatas[token][msg.sender];
         require(lockData.cooldownAmount > 0, "nothing to withdraw");
         require(lockData.cooldownEndTimestamp <= block.timestamp, "coolingdown");
-        require(lockData.amount <= lockData.cooldownAmount, "no enough balance to withdraw");
-        IERC20(token).safeTransfer(msg.sender, amount);
+        require(amount <= lockData.cooldownAmount, "no enough balance to withdraw");
         lockData.cooldownAmount -= amount;
         LockConfig storage lockConfig = lockConfigs[token];
         lockConfig.totalCooldown -= amount;
+        IERC20(token).safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, token, amount);
     }
 }

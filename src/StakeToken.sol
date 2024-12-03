@@ -27,6 +27,11 @@ contract StakeToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
     event UnStake(address unstaker, uint256 amount);
     event Withdraw(address withdrawer, uint256 amount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         string memory name_,
         string memory symbol_,
@@ -78,8 +83,8 @@ contract StakeToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
         CooldownInfo storage cooldownInfo = cooldownInfos[msg.sender];
         require(cooldownInfo.cooldownAmount >= amount, "not enough cooldown amount");
         require(cooldownInfo.cooldownEndTimestamp <= block.timestamp, "cooldowning");
-        IERC20(token).safeTransfer(msg.sender, amount);
         cooldownInfo.cooldownAmount -= amount;
+        IERC20(token).safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, amount);
     }
 }

@@ -23,6 +23,11 @@ contract StakeFactory is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     event SetSTImpl(address oldSTImpl, address stImpl);
     event UpgradeStakeToken(uint256 assetID, address oldSTImpl, address stImpl);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address owner, address factoryAddress_, address stImpl_) public initializer {
         __Ownable_init(owner);
         __UUPSUpgradeable_init();
