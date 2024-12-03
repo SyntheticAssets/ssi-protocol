@@ -27,6 +27,11 @@ contract StakeToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
     event UnStake(address unstaker, uint256 amount);
     event Withdraw(address withdrawer, uint256 amount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(
         string memory name_,
         string memory symbol_,

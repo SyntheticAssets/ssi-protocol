@@ -20,6 +20,11 @@ contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable, Pau
     event UnLock(address locker, address token, uint256 amount);
     event Withdraw(address locker, address token, uint256 amount);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address owner) public initializer {
         __Ownable_init(owner);
         __UUPSUpgradeable_init();

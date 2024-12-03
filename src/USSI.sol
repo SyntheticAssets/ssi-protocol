@@ -62,6 +62,11 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
     event RejectRedeem(bytes32 orderHash);
     event ConfirmRedeem(bytes32 orderHash);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address owner, address orderSigner_, address factoryAddress_, address redeemToken_) public initializer {
         __Ownable_init(owner);
         __AccessControl_init();

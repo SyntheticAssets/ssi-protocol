@@ -35,6 +35,11 @@ contract AssetToken is Initializable, ERC20Upgradeable, AccessControlUpgradeable
     event SetBasket(Token[] basket);
     event SetFeeTokenset(Token[] feeTokenset);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize (
         uint256 id_,
         string memory name_,

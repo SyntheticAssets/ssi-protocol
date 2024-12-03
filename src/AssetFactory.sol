@@ -35,6 +35,11 @@ contract AssetFactory is Initializable, OwnableUpgradeable, UUPSUpgradeable, IAs
     event SetRebalancer(uint256 assetID, address oldRebalancer, address rebalancer);
     event SetFeeManager(uint256 assetID, address oldFeeManager, address feeManager);
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     function initialize(address owner, address swap_, address vault_, string memory chain_, address tokenImpl_) public initializer {
         __Ownable_init(owner);
         __UUPSUpgradeable_init();
