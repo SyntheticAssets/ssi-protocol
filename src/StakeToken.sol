@@ -78,8 +78,8 @@ contract StakeToken is Initializable, ERC20Upgradeable, OwnableUpgradeable, UUPS
         CooldownInfo storage cooldownInfo = cooldownInfos[msg.sender];
         require(cooldownInfo.cooldownAmount >= amount, "not enough cooldown amount");
         require(cooldownInfo.cooldownEndTimestamp <= block.timestamp, "cooldowning");
-        IERC20(token).safeTransfer(msg.sender, amount);
         cooldownInfo.cooldownAmount -= amount;
+        IERC20(token).safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, amount);
     }
 }
