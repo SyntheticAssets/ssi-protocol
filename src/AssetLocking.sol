@@ -16,8 +16,8 @@ contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable, Pau
 
     event SetEpoch(address token, uint8 oldEpoch, uint8 newEpoch);
     event UpdateLockConfig(address token, uint8 epoch, uint256 lockLimit, uint48 cooldown);
-    event Lock(address locker, address token, uint256 amount);
-    event UnLock(address locker, address token, uint256 amount);
+    event Lock(address locker, address token, uint256 amount, uint256 userLockAmount, uint256 totalLockAmount);
+    event UnLock(address locker, address token, uint256 amount, uint256 userLockAmount, uint256 totalLockAmount);
     event Withdraw(address locker, address token, uint256 amount);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -107,7 +107,7 @@ contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable, Pau
         lockData.amount += amount;
         lockConfig.totalLock += amount;
         IERC20(token).transferFrom(msg.sender, address(this), amount);
-        emit Lock(msg.sender, token, amount);
+        emit Lock(msg.sender, token, amount, lockData.amount, lockConfig.totalLock);
     }
 
     function unlock(address token, uint256 amount) external whenNotPaused {
@@ -119,7 +119,7 @@ contract AssetLocking is Initializable, OwnableUpgradeable, UUPSUpgradeable, Pau
         lockData.cooldownEndTimestamp = block.timestamp + lockConfig.cooldown;
         lockConfig.totalLock -= amount;
         lockConfig.totalCooldown += amount;
-        emit UnLock(msg.sender, token, amount);
+        emit UnLock(msg.sender, token, amount, lockData.amount, lockConfig.totalLock);
     }
 
     function withdraw(address token, uint256 amount) external whenNotPaused {
