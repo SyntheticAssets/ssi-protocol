@@ -41,12 +41,14 @@ contract DeployerScript is Script {
             address(stakeFactoryImpl),
             abi.encodeCall(StakeFactory.initialize, (owner, address(factory), address(stakeTokenImpl)))
         ));
+        AssetLocking assetLockingImpl = new AssetLocking();
         address assetLocking = address(new ERC1967Proxy(
-            address(new AssetLocking()),
+            address(assetLockingImpl),
             abi.encodeCall(AssetLocking.initialize, owner)
         ));
+        USSI uSSIImpl = new USSI();
         address uSSI = address(new ERC1967Proxy(
-            address(new USSI()),
+            address(uSSIImpl),
             abi.encodeCall(USSI.initialize, (owner, orderSigner, address(factory), redeemToken))
         ));
         address sUSSI = address(new ERC1967Proxy(
@@ -54,6 +56,14 @@ contract DeployerScript is Script {
             abi.encodeCall(StakeToken.initialize, ("Staked USSI", "sUSSI", address(uSSI), 7 days, owner))
         ));
         vm.stopBroadcast();
+        // impl
+        console.log(string.concat("tokenImpl=", vm.toString(address(tokenImpl))));
+        console.log(string.concat("factoryImpl=", vm.toString(address(factoryImpl))));
+        console.log(string.concat("stakeTokenImpl=", vm.toString(address(stakeTokenImpl))));
+        console.log(string.concat("stakeFactoryImpl=", vm.toString(address(stakeFactoryImpl))));
+        console.log(string.concat("assetLockingImpl=", vm.toString(address(assetLockingImpl))));
+        console.log(string.concat("uSSIImpl=", vm.toString(address(uSSIImpl))));
+
         console.log(string.concat("swap=", vm.toString(address(swap))));
         console.log(string.concat("factory=", vm.toString(address(factory))));
         console.log(string.concat("issuer=", vm.toString(address(issuer))));

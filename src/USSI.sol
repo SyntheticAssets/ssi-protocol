@@ -33,7 +33,9 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         uint256 outAmount;
         uint256 deadline;
         address requester;
-        uint256[5] __gap;
+        address receiver;
+        uint96 __residual;
+        uint256[4] __gap;
     }
 
     EnumerableSet.Bytes32Set orderHashs;
@@ -130,6 +132,7 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
             require(supportAssetIDs.contains(hedgeOrder.assetID), "assetID not supported");
         }
         if (hedgeOrder.orderType == HedgeOrderType.REDEEM) {
+            require(hedgeOrder.receiver != address(0), "receiver is zero address");
             require(redeemToken == hedgeOrder.redeemToken, "redeem token not supported");
         }
         require(block.timestamp <= hedgeOrder.deadline, "expired");
