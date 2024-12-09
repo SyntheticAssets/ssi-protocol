@@ -35,8 +35,6 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         uint256 deadline;
         address requester;
         address receiver;
-        uint96 __residual;
-        uint256[4] __gap;
     }
 
     EnumerableSet.Bytes32Set orderHashs;
