@@ -84,7 +84,7 @@ contract StakingTest is Test {
         )));
         uSSI = USSI(address(new ERC1967Proxy(
             address(new USSI()),
-            abi.encodeCall(USSI.initialize, (owner, orderSigner, address(factory), address(WBTC)))
+            abi.encodeCall(USSI.initialize, (owner, orderSigner, address(factory), address(WBTC), "SETH"))
         )));
         vm.stopPrank();
         vm.startPrank(address(issuer));
@@ -194,6 +194,7 @@ contract StakingTest is Test {
     function testUSSI() public {
         // apply mint
         USSI.HedgeOrder memory mintOrder = USSI.HedgeOrder({
+            chain: "SETH",
             orderType: USSI.HedgeOrderType.MINT,
             assetID: 1,
             redeemToken: address(0),
@@ -229,6 +230,7 @@ contract StakingTest is Test {
         assertEq(uSSI.balanceOf(hedger), stakeAmount * 10);
         // apply redeem
         USSI.HedgeOrder memory redeemOrder = USSI.HedgeOrder({
+            chain: "SETH",
             orderType: USSI.HedgeOrderType.REDEEM,
             assetID: 1,
             redeemToken: uSSI.redeemToken(),

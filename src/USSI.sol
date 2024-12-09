@@ -25,6 +25,7 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
     enum HedgeOrderStatus { NONE, PENDING, REJECTED, CONFIRMED }
 
     struct HedgeOrder {
+        string chain;
         HedgeOrderType orderType;
         uint256 assetID;
         address redeemToken;
@@ -53,6 +54,8 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
 
     mapping(bytes32 => bytes32) public redeemTxHashs;
 
+    string public chain;
+
     event AddAssetID(uint256 assetID);
     event RemoveAssetID(uint256 assetID);
     event UpdateOrderSigner(address oldOrderSigner, address orderSigner);
@@ -69,7 +72,7 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         _disableInitializers();
     }
 
-    function initialize(address owner, address orderSigner_, address factoryAddress_, address redeemToken_) public initializer {
+    function initialize(address owner, address orderSigner_, address factoryAddress_, address redeemToken_, string memory chain_) public initializer {
         __Ownable_init(owner);
         __AccessControl_init();
         __ERC20_init("USSI", "USSI");
@@ -81,10 +84,19 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         factoryAddress = factoryAddress_;
         redeemToken = redeemToken_;
         orderSigner = orderSigner_;
+        chain = chain_;
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 
     function decimals() public pure override(ERC20Upgradeable) returns (uint8) {
         return 8;
@@ -128,6 +140,7 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
     }
 
     function checkHedgeOrder(HedgeOrder calldata hedgeOrder, bytes32 orderHash, bytes calldata orderSignature) public view {
+        require(keccak256(abi.encode(chain)) == keccak256(abi.encode(hedgeOrder.chain)), "chain not match");
         if (hedgeOrder.orderType == HedgeOrderType.MINT) {
             require(supportAssetIDs.contains(hedgeOrder.assetID), "assetID not supported");
         }
