@@ -13,6 +13,8 @@ contract LayoutV2 is Initializable {
 
     mapping (address => Account) public accounts;
 
+    uint gap;
+
     function initialize() public initializer {}
 
     function setAccount(address account, Account memory accountInfo) public {

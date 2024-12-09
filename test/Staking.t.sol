@@ -203,9 +203,7 @@ contract StakingTest is Test {
             outAmount: stakeAmount * 10,
             deadline: block.timestamp + 600,
             requester: hedger,
-            receiver: hedger,
-            __residual: uint96(0),
-            __gap: [uint256(0),uint256(0),uint256(0),uint256(0)]
+            receiver: hedger
         });
         vm.startPrank(hedger);
         vm.expectRevert();
@@ -239,9 +237,7 @@ contract StakingTest is Test {
             outAmount: stakeAmount,
             deadline: block.timestamp + 600,
             requester: hedger,
-            receiver: hedger,
-            __residual: uint96(0),
-            __gap: [uint256(0),uint256(0),uint256(0),uint256(0)]
+            receiver: hedger
         });
         orderHash = keccak256(abi.encode(redeemOrder));
         (v, r, s) = vm.sign(orderSignerPk, orderHash);
