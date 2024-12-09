@@ -331,6 +331,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         IAssetFactory factory = IAssetFactory(factoryAddress);
         IAssetToken assetToken = IAssetToken(factory.assetTokens(assetID));
         require(assetToken.allowance(msg.sender, address(this)) >= amount, "not enough allowance");
+        require(assetToken.feeCollected(), "asset token has fee not collected");
         assetToken.lockIssue();
         assetToken.safeTransferFrom(msg.sender, address(this), amount);
         assetToken.burn(amount);

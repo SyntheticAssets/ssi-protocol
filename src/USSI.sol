@@ -156,6 +156,10 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         bytes32 orderHash = keccak256(abi.encode(hedgeOrder));
         checkHedgeOrder(hedgeOrder, orderHash, orderSignature);
         require(hedgeOrder.orderType == HedgeOrderType.MINT, "order type not match");
+        // cannot hedge when underlying is changing
+        IAssetToken assetToken = IAssetToken(IAssetFactory(factoryAddress).assetTokens(hedgeOrder.assetID));
+        require(!assetToken.rebalancing(), "asset token is rebalancing");
+        require(assetToken.feeCollected(), "asset token has fee not collected");
         HedgeOrder storage hedgeOrder_ = hedgeOrders[orderHash];
         hedgeOrder_.orderType = hedgeOrder.orderType;
         hedgeOrder_.assetID = hedgeOrder.assetID;
@@ -167,9 +171,8 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         orderHashs.add(orderHash);
         orderStatus[orderHash] = HedgeOrderStatus.PENDING;
         requestTimestamps[orderHash] = block.timestamp;
-        IERC20 assetToken = IERC20(IAssetFactory(factoryAddress).assetTokens(hedgeOrder.assetID));
-        require(assetToken.allowance(hedgeOrder.requester, address(this)) >= hedgeOrder.inAmount, "not enough allowance");
-        assetToken.safeTransferFrom(hedgeOrder.requester, address(this), hedgeOrder.inAmount);
+        require(IERC20(assetToken).allowance(hedgeOrder.requester, address(this)) >= hedgeOrder.inAmount, "not enough allowance");
+        IERC20(assetToken).safeTransferFrom(hedgeOrder.requester, address(this), hedgeOrder.inAmount);
         emit ApplyMint(hedgeOrder);
     }
 
