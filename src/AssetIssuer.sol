@@ -33,10 +33,10 @@ contract AssetIssuer is AssetController, IAssetIssuer {
     event AddParticipant(uint indexed assetID, address participant);
     event RemoveParticipant(uint indexed assetID, address participant);
     event AddMintRequest(uint nonce);
-    event RejectMintRequest(uint nonce);
+    event RejectMintRequest(uint nonce, bool force);
     event ConfirmMintRequest(uint nonce);
     event AddRedeemRequest(uint nonce);
-    event RejectRedeemRequest(uint nonce);
+    event RejectRedeemRequest(uint nonce, bool force);
     event ConfirmRedeemRequest(uint nonce);
 
     constructor(address owner, address factoryAddress_)
@@ -128,14 +128,21 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         return mintRequests.length-1;
     }
 
-    function rejectMintRequest(uint nonce, OrderInfo memory orderInfo) external onlyOwner {
+    function rejectMintRequest(uint nonce, OrderInfo memory orderInfo, bool force) external onlyOwner {
         require(nonce < mintRequests.length);
         Request memory mintRequest = mintRequests[nonce];
         checkRequestOrderInfo(mintRequest, orderInfo);
         require(mintRequest.status == RequestStatus.PENDING);
         ISwap swap = ISwap(mintRequest.swapAddress);
         SwapRequest memory swapRequest = swap.getSwapRequest(mintRequest.orderHash);
-        require(swapRequest.status == SwapRequestStatus.REJECTED || swapRequest.status == SwapRequestStatus.CANCEL || swapRequest.status == SwapRequestStatus.FORCE_CANCEL, "swap request is not rejected/cancelled/force cancelled");
+        if (!force) {
+            require(swapRequest.status == SwapRequestStatus.REJECTED ||
+                    swapRequest.status == SwapRequestStatus.CANCEL ||
+                    swapRequest.status == SwapRequestStatus.FORCE_CANCEL,
+                    "swap request is not rejected/cancelled/force cancelled");
+        } else {
+            require(swapRequest.status == SwapRequestStatus.CONFIRMED, "swap request is not confirmed");
+        }
         Order memory order = orderInfo.order;
         Token[] memory inTokenset = order.inTokenset;
         IAssetFactory factory = IAssetFactory(factoryAddress);
@@ -152,7 +159,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         IAssetToken assetToken = IAssetToken(mintRequest.assetTokenAddress);
         assetToken.unlockIssue();
         mintRequests[nonce].status = RequestStatus.REJECTED;
-        emit RejectMintRequest(nonce);
+        emit RejectMintRequest(nonce, force);
     }
 
     function confirmMintRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external onlyOwner {
@@ -240,19 +247,26 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         return redeemRequests.length - 1;
     }
 
-    function rejectRedeemRequest(uint nonce) external onlyOwner {
+    function rejectRedeemRequest(uint nonce, bool force) external onlyOwner {
         require(nonce < redeemRequests.length, "nonce too large");
         Request memory redeemRequest = redeemRequests[nonce];
         require(redeemRequest.status == RequestStatus.PENDING, "redeem request is not pending");
         ISwap swap = ISwap(redeemRequest.swapAddress);
         SwapRequest memory swapRequest = swap.getSwapRequest(redeemRequest.orderHash);
-        require(swapRequest.status == SwapRequestStatus.REJECTED || swapRequest.status == SwapRequestStatus.CANCEL || swapRequest.status == SwapRequestStatus.FORCE_CANCEL, "swap request is not rejected/cancelled/force cancelled");
+        if (!force) {
+            require(swapRequest.status == SwapRequestStatus.REJECTED ||
+                    swapRequest.status == SwapRequestStatus.CANCEL ||
+                    swapRequest.status == SwapRequestStatus.FORCE_CANCEL,
+                    "swap request is not rejected/cancelled/force cancelled");
+        } else {
+            require(swapRequest.status == SwapRequestStatus.CONFIRMED, "swap request is not confirmed");
+        }
         IAssetToken assetToken = IAssetToken(redeemRequest.assetTokenAddress);
         require(assetToken.balanceOf(address(this)) >= redeemRequest.amount, "not enough asset token to transfer");
         assetToken.safeTransfer(redeemRequest.requester, redeemRequest.amount);
         redeemRequests[nonce].status = RequestStatus.REJECTED;
         assetToken.unlockIssue();
-        emit RejectRedeemRequest(nonce);
+        emit RejectRedeemRequest(nonce, force);
     }
 
     function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external onlyOwner {
