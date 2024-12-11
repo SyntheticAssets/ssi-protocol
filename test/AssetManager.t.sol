@@ -470,7 +470,7 @@ contract FundManagerTest is Test {
         // inToken.transfer(address(issuer), tokenAmount + feeAmount);
         // vm.stopPrank();
         vm.startPrank(owner);
-        issuer.rejectMintRequest(nonce, orderInfo, false);
+        issuer.rejectMintRequest(nonce, orderInfo);
         assertEq(inToken.balanceOf(ap), amountBeforeMint);
         assertTrue(issuer.getMintRequest(nonce).status == RequestStatus.REJECTED);
         assertTrue(swap.getSwapRequest(mintRequest.orderHash).status == SwapRequestStatus.REJECTED);
@@ -485,7 +485,7 @@ contract FundManagerTest is Test {
         swap.makerRejectSwapRequest(orderInfo);
         vm.stopPrank();
         vm.startPrank(owner);
-        issuer.rejectRedeemRequest(nonce, false);
+        issuer.rejectRedeemRequest(nonce);
         assertEq(IERC20(assetTokenAddress).balanceOf(ap), amountBeforeRedeem);
         assertTrue(issuer.getRedeemRequest(nonce).status == RequestStatus.REJECTED);
         assertTrue(swap.getSwapRequest(redeemRequest.orderHash).status == SwapRequestStatus.REJECTED);
@@ -726,7 +726,7 @@ contract FundManagerTest is Test {
         SwapRequest memory swapRequest = swap.getSwapRequest(orderInfo.orderHash);
         assertTrue(swapRequest.status == SwapRequestStatus.CANCEL);
         vm.startPrank(owner);
-        issuer.rejectMintRequest(nonce, orderInfo, false);
+        issuer.rejectMintRequest(nonce, orderInfo);
         assertEq(inToken.balanceOf(ap), amountBeforeMint);
         assertTrue(issuer.getMintRequest(nonce).status == RequestStatus.REJECTED);
     }
@@ -753,7 +753,7 @@ contract FundManagerTest is Test {
         swap.makerRejectSwapRequest(orderInfo);
         vm.stopPrank();
         vm.startPrank(owner);
-        issuer.rejectMintRequest(nonce, orderInfo, false);
+        issuer.rejectMintRequest(nonce, orderInfo);
         issuer.withdraw(tokenAddresses);
         assertEq(WETH.balanceOf(owner), 10**18);
     }

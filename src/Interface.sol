@@ -151,13 +151,13 @@ interface IAssetIssuer is IAssetController {
     function getMintRequestLength() external view returns (uint256);
     function getMintRequest(uint256 nonce) external view returns (Request memory);
     function addMintRequest(uint256 assetID, OrderInfo memory orderInfo, uint256 maxIssueFee) external returns (uint);
-    function rejectMintRequest(uint256 nonce, OrderInfo memory orderInfo, bool force) external;
+    function rejectMintRequest(uint256 nonce, OrderInfo memory orderInfo) external;
     function confirmMintRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external;
     // redeem
     function getRedeemRequestLength() external view returns (uint256);
     function getRedeemRequest(uint256 nonce) external view returns (Request memory);
     function addRedeemRequest(uint256 assetID, OrderInfo memory orderInfo, uint256 maxIssueFee) external returns (uint256);
-    function rejectRedeemRequest(uint256 nonce, bool force) external;
+    function rejectRedeemRequest(uint256 nonce) external;
     function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external;
     // manage participants
     function isParticipant(uint256 assetID, address participant) external view returns (bool);
