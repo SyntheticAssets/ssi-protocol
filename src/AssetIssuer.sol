@@ -28,6 +28,9 @@ contract AssetIssuer is AssetController, IAssetIssuer {
 
     uint256 public feeDecimals = 8;
 
+    mapping(address => mapping(address => uint256)) public claimables;
+    mapping(address => uint256) public tokenClaimables;
+
     event SetIssueAmountRange(uint indexed assetID, uint min, uint max);
     event SetIssueFee(uint indexed assetID, uint issueFee);
     event AddParticipant(uint indexed assetID, address participant);
@@ -37,7 +40,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
     event ConfirmMintRequest(uint nonce);
     event AddRedeemRequest(uint nonce);
     event RejectRedeemRequest(uint nonce);
-    event ConfirmRedeemRequest(uint nonce);
+    event ConfirmRedeemRequest(uint nonce, bool force);
 
     constructor(address owner, address factoryAddress_)
         AssetController(owner, factoryAddress_) {
@@ -255,7 +258,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         emit RejectRedeemRequest(nonce);
     }
 
-    function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external onlyOwner {
+    function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs, bool force) external onlyOwner {
         require(nonce < redeemRequests.length);
         Request memory redeemRequest = redeemRequests[nonce];
         checkRequestOrderInfo(redeemRequest, orderInfo);
@@ -276,13 +279,18 @@ contract AssetIssuer is AssetController, IAssetIssuer {
             uint feeTokenAmount = outTokenAmount * redeemRequest.issueFee / 10**feeDecimals;
             uint transferAmount = outTokenAmount - feeTokenAmount;
             require(outToken.balanceOf(address(this)) >= outTokenAmount, "not enough balance");
-            outToken.safeTransfer(redeemRequest.requester, transferAmount);
-            outToken.safeTransfer(vault, feeTokenAmount);
+            if (!force) {
+                outToken.safeTransfer(redeemRequest.requester, transferAmount);
+                outToken.safeTransfer(vault, feeTokenAmount);
+            } else {
+                claimables[tokenAddress][redeemRequest.requester] += transferAmount;
+                tokenClaimables[tokenAddress] += transferAmount;
+            }
         }
         assetToken.burn(redeemRequest.amount);
         redeemRequests[nonce].status = RequestStatus.CONFIRMED;
         assetToken.unlockIssue();
-        emit ConfirmRedeemRequest(nonce);
+        emit ConfirmRedeemRequest(nonce, force);
     }
 
     function isParticipant(uint256 assetID, address participant) external view returns (bool) {
@@ -326,9 +334,12 @@ contract AssetIssuer is AssetController, IAssetIssuer {
             require(!assetToken.issuing(), "is issuing");
         }
         for (uint i = 0; i < tokenAddresses.length; i++) {
-            if (tokenAddresses[i] != address(0)) {
-                IERC20 token = IERC20(tokenAddresses[i]);
-                token.safeTransfer(owner(), token.balanceOf(address(this)));
+            address tokenAddress = tokenAddresses[i];
+            if (tokenAddress != address(0)) {
+                IERC20 token = IERC20(tokenAddress);
+                if (token.balanceOf(address(this)) > tokenClaimables[tokenAddress]) {
+                    token.safeTransfer(owner(), token.balanceOf(address(this)) - tokenClaimables[tokenAddress]);
+                }
             }
         }
     }
@@ -342,5 +353,13 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         assetToken.safeTransferFrom(msg.sender, address(this), amount);
         assetToken.burn(amount);
         assetToken.unlockIssue();
+    }
+
+    function claim(address token) external whenNotPaused {
+        require(claimables[token][msg.sender] > 0, "nothing to claim");
+        uint256 amount = claimables[token][msg.sender];
+        claimables[token][msg.sender] = 0;
+        tokenClaimables[token] -= amount;
+        IERC20(token).safeTransfer(msg.sender, amount);
     }
 }

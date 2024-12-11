@@ -239,7 +239,7 @@ contract FundManagerTest is Test {
         vm.startPrank(owner);
         bytes[] memory inTxHashs = new bytes[](1);
         inTxHashs[0] = 'inTxHashs';
-        issuer.confirmRedeemRequest(nonce, orderInfo, inTxHashs);
+        issuer.confirmRedeemRequest(nonce, orderInfo, inTxHashs, false);
         vm.stopPrank();
     }
 
@@ -769,5 +769,37 @@ contract FundManagerTest is Test {
         assertEq(token.balanceOf(address(issuer)), 0);
         Token[] memory tokens = token.getBasket();
         assertEq(tokens.length, 0);
+    }
+
+    function test_forceConfirmRedeemRequest() public {
+        address assetTokenAddress = test_Mint();
+        OrderInfo memory orderInfo = pmmQuoteRedeem();
+        (uint nonce, ) = apAddRedeemRequest(assetTokenAddress, orderInfo);
+        uint256 beforeAmount = IERC20(vm.parseAddress(orderInfo.order.outTokenset[0].addr)).balanceOf(vault);
+        pmmConfirmSwapRequest(orderInfo, true);
+        vaultConfirmSwap(orderInfo, beforeAmount, false);
+        address outTokenAddress = vm.parseAddress(orderInfo.order.outTokenset[0].addr);
+        MockToken outToken = MockToken(outTokenAddress);
+        outToken.blockAccount(ap, true);
+        vm.startPrank(owner);
+        bytes[] memory inTxHashs = new bytes[](1);
+        inTxHashs[0] = 'inTxHashs';
+        vm.expectRevert();
+        issuer.confirmRedeemRequest(nonce, orderInfo, inTxHashs, false);
+        issuer.confirmRedeemRequest(nonce, orderInfo, inTxHashs, true);
+        vm.stopPrank();
+        assertEq(IERC20(assetTokenAddress).balanceOf(ap), 0);
+        uint256 expectAmount = orderInfo.order.outTokenset[0].amount * orderInfo.order.outAmount / 10 ** 8;
+        assertEq(outToken.balanceOf(ap), 0);
+        vm.startPrank(owner);
+        address[] memory withdrawTokens = new address[](1);
+        withdrawTokens[0] = outTokenAddress;
+        issuer.withdraw(withdrawTokens);
+        vm.stopPrank();
+        outToken.blockAccount(ap, false);
+        vm.startPrank(ap);
+        issuer.claim(outTokenAddress);
+        assertEq(outToken.balanceOf(ap), expectAmount - expectAmount * 10000 / 10**8);
+        vm.stopPrank();
     }
 }

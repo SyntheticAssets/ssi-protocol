@@ -158,7 +158,7 @@ interface IAssetIssuer is IAssetController {
     function getRedeemRequest(uint256 nonce) external view returns (Request memory);
     function addRedeemRequest(uint256 assetID, OrderInfo memory orderInfo, uint256 maxIssueFee) external returns (uint256);
     function rejectRedeemRequest(uint256 nonce) external;
-    function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external;
+    function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs, bool force) external;
     // manage participants
     function isParticipant(uint256 assetID, address participant) external view returns (bool);
     function getParticipants(uint256 assetID) external view returns (address[] memory);
