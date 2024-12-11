@@ -135,7 +135,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         require(mintRequest.status == RequestStatus.PENDING);
         ISwap swap = ISwap(mintRequest.swapAddress);
         SwapRequest memory swapRequest = swap.getSwapRequest(mintRequest.orderHash);
-        require(swapRequest.status == SwapRequestStatus.REJECTED || swapRequest.status == SwapRequestStatus.CANCEL, "swap request is not rejected or cancelled");
+        require(swapRequest.status == SwapRequestStatus.REJECTED || swapRequest.status == SwapRequestStatus.CANCEL || swapRequest.status == SwapRequestStatus.FORCE_CANCEL, "swap request is not rejected/cancelled/force cancelled");
         Order memory order = orderInfo.order;
         Token[] memory inTokenset = order.inTokenset;
         IAssetFactory factory = IAssetFactory(factoryAddress);
@@ -246,7 +246,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         require(redeemRequest.status == RequestStatus.PENDING, "redeem request is not pending");
         ISwap swap = ISwap(redeemRequest.swapAddress);
         SwapRequest memory swapRequest = swap.getSwapRequest(redeemRequest.orderHash);
-        require(swapRequest.status == SwapRequestStatus.REJECTED || swapRequest.status == SwapRequestStatus.CANCEL, "swap request is not rejected or cancelled");
+        require(swapRequest.status == SwapRequestStatus.REJECTED || swapRequest.status == SwapRequestStatus.CANCEL || swapRequest.status == SwapRequestStatus.FORCE_CANCEL, "swap request is not rejected/cancelled/force cancelled");
         IAssetToken assetToken = IAssetToken(redeemRequest.assetTokenAddress);
         require(assetToken.balanceOf(address(this)) >= redeemRequest.amount, "not enough asset token to transfer");
         assetToken.safeTransfer(redeemRequest.requester, redeemRequest.amount);

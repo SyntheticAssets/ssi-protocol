@@ -81,7 +81,7 @@ contract AssetFeeManager is AssetController, IAssetFeeManager {
         require(burnFeeRequest.status == RequestStatus.PENDING);
         ISwap swap = ISwap(burnFeeRequest.swapAddress);
         SwapRequest memory swapRequest = swap.getSwapRequest(burnFeeRequest.orderHash);
-        require(swapRequest.status == SwapRequestStatus.REJECTED || swapRequest.status == SwapRequestStatus.CANCEL);
+        require(swapRequest.status == SwapRequestStatus.REJECTED || swapRequest.status == SwapRequestStatus.CANCEL || swapRequest.status == SwapRequestStatus.FORCE_CANCEL);
         IAssetToken assetToken = IAssetToken(burnFeeRequest.assetTokenAddress);
         assetToken.unlockBurnFee();
         burnFeeRequests[nonce].status = RequestStatus.REJECTED;

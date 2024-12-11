@@ -45,7 +45,7 @@ struct Range {
     uint256 max;
 }
 
-enum SwapRequestStatus {NONE, PENDING, MAKER_CONFIRMED, CONFIRMED, REJECTED, CANCEL}
+enum SwapRequestStatus {NONE, PENDING, MAKER_CONFIRMED, CONFIRMED, REJECTED, CANCEL, FORCE_CANCEL}
 
 struct SwapRequest {
     bytes[] inTxHashs;
@@ -58,7 +58,7 @@ struct SwapRequest {
     uint256 requestTimestamp;
 }
 
-enum RequestStatus {NONE, PENDING, CONFIRMED, REJECTED}
+enum RequestStatus {NONE, PENDING, CONFIRMED, REJECTED, FORCE_REJECTED}
 
 struct Request {
     uint nonce;

@@ -73,7 +73,7 @@ contract AssetRebalancer is AssetController, IAssetRebalancer {
         require(rebalanceRequest.status == RequestStatus.PENDING);
         ISwap swap = ISwap(rebalanceRequest.swapAddress);
         SwapRequest memory swapRequest = swap.getSwapRequest(rebalanceRequest.orderHash);
-        require(swapRequest.status == SwapRequestStatus.REJECTED || swapRequest.status == SwapRequestStatus.CANCEL);
+        require(swapRequest.status == SwapRequestStatus.REJECTED || swapRequest.status == SwapRequestStatus.CANCEL || swapRequest.status == SwapRequestStatus.FORCE_CANCEL);
         IAssetToken assetToken = IAssetToken(rebalanceRequest.assetTokenAddress);
         assetToken.unlockRebalance();
         rebalanceRequests[nonce].status = RequestStatus.REJECTED;

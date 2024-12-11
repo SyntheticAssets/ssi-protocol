@@ -33,6 +33,7 @@ contract Swap is AccessControl, Pausable, ISwap {
     event RollbackSwapRequest(address indexed taker, bytes32 orderHash);
     event SetTakerAddresses(string[] receivers, string[] senders);
     event CancelSwapRequest(address indexed taker, bytes32 orderHash);
+    event ForceCancelSwapRequest(bytes32 orderHash);
 
     constructor(address owner, string memory chain_) {
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
@@ -142,6 +143,16 @@ contract Swap is AccessControl, Pausable, ISwap {
         swapRequests[orderHash].status = SwapRequestStatus.CANCEL;
         swapRequests[orderHash].blocknumber = block.number;
         emit CancelSwapRequest(msg.sender, orderHash);
+    }
+
+    function forceCancelSwapRequest(OrderInfo memory orderInfo) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
+        validateOrderInfo(orderInfo);
+        bytes32 orderHash = orderInfo.orderHash;
+        require(swapRequests[orderHash].status == SwapRequestStatus.PENDING || swapRequests[orderHash].status == SwapRequestStatus.MAKER_CONFIRMED, "swap request status is not pending or maker confirmed");
+        require(swapRequests[orderHash].requestTimestamp + EXPIRATION <= block.timestamp, "swap request not expired");
+        swapRequests[orderHash].status = SwapRequestStatus.FORCE_CANCEL;
+        swapRequests[orderHash].blocknumber = block.number;
+        emit ForceCancelSwapRequest(orderHash);
     }
 
     function makerRejectSwapRequest(OrderInfo memory orderInfo) external onlyRole(MAKER_ROLE) whenNotPaused {
