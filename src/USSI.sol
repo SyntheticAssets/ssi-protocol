@@ -197,7 +197,7 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         IERC20 assetToken = IERC20(IAssetFactory(factoryAddress).assetTokens(hedgeOrder.assetID));
         IAssetIssuer issuer = IAssetIssuer(IAssetFactory(factoryAddress).issuers(hedgeOrder.assetID));
         if (assetToken.allowance(address(this), address(issuer)) < hedgeOrder.inAmount) {
-            assetToken.forceApprove(address(issuer), type(uint256).max);
+            assetToken.forceApprove(address(issuer), hedgeOrder.inAmount);
         }
         issuer.burnFor(hedgeOrder.assetID, hedgeOrder.inAmount);
         emit ConfirmMint(orderHash);

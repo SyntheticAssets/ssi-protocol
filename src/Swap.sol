@@ -24,6 +24,7 @@ contract Swap is AccessControl, Pausable, ISwap {
     string[] public takerSenders;
 
     uint256 public constant MAX_MARKER_CONFIRM_DELAY = 1 hours;
+    uint256 public constant EXPIRATION = 6 hours;
 
     event AddSwapRequest(address indexed taker, bool inByContract, bool outByContract, OrderInfo orderInfo);
     event MakerConfirmSwapRequest(address indexed maker, bytes32 orderHash);

@@ -31,6 +31,7 @@ struct Order {
     uint256 inAmount;
     uint256 outAmount;
     uint256 deadline;
+    address requester;
 }
 
 struct OrderInfo {
@@ -110,20 +111,22 @@ interface IAssetToken is IERC20, IAccessControl {
 }
 
 interface IAssetFactory {
-    function swap() external view returns (address);
     function vault() external view returns (address);
     function chain() external view returns (string memory);
     // asset tokens
-    function createAssetToken(Asset memory asset, uint maxFee, address issuer, address rebalancer, address feeMamanger) external returns (address);
+    function createAssetToken(Asset memory asset, uint maxFee, address issuer, address rebalancer, address feeMamanger, address swap) external returns (address);
     function assetTokens(uint assetID) external view returns (address);
     function hasAssetID(uint assetID) external view returns (bool);
     function getAssetIDs() external view returns (uint[] memory);
     function issuers(uint assetID) external view returns (address);
     function rebalancers(uint assetID) external view returns (address);
     function feeManagers(uint assetID) external view returns (address);
+    function swaps(uint assetID) external view returns (address);
 }
 
 interface ISwap is IAccessControl {
+    function TAKER_ROLE() external returns (bytes32);
+    function MAKER_ROLE() external returns (bytes32);
     function checkOrderInfo(OrderInfo memory orderInfo) external view returns (uint);
     function getOrderHashs() external view returns (bytes32[] memory);
     function getOrderHashLength() external view returns (uint256);
@@ -147,13 +150,13 @@ interface IAssetIssuer is IAssetController {
     // mint
     function getMintRequestLength() external view returns (uint256);
     function getMintRequest(uint256 nonce) external view returns (Request memory);
-    function addMintRequest(uint256 assetID, OrderInfo memory orderInfo) external returns (uint);
+    function addMintRequest(uint256 assetID, OrderInfo memory orderInfo, uint256 maxIssueFee) external returns (uint);
     function rejectMintRequest(uint256 nonce, OrderInfo memory orderInfo) external;
     function confirmMintRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external;
     // redeem
     function getRedeemRequestLength() external view returns (uint256);
     function getRedeemRequest(uint256 nonce) external view returns (Request memory);
-    function addRedeemRequest(uint256 assetID, OrderInfo memory orderInfo) external returns (uint256);
+    function addRedeemRequest(uint256 assetID, OrderInfo memory orderInfo, uint256 maxIssueFee) external returns (uint256);
     function rejectRedeemRequest(uint256 nonce) external;
     function confirmRedeemRequest(uint nonce, OrderInfo memory orderInfo, bytes[] memory inTxHashs) external;
     // manage participants

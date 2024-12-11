@@ -58,14 +58,14 @@ contract UpgradeTest is Test {
         AssetFactory factoryImpl = new AssetFactory();
         factory = AssetFactory(address(new ERC1967Proxy(
             address(factoryImpl),
-            abi.encodeCall(AssetFactory.initialize, (owner, address(swap), vault, chain, address(tokenImpl)))
+            abi.encodeCall(AssetFactory.initialize, (owner, vault, chain, address(tokenImpl)))
         )));
         AssetIssuer issuer = new AssetIssuer(owner, address(factory));
         AssetRebalancer rebalancer = new AssetRebalancer(owner, address(factory));
         AssetFeeManager feeManager = new AssetFeeManager(owner, address(factory));
 
         vm.startPrank(owner);
-        assetToken = AssetFactory(factory).createAssetToken(getAsset(), 10000, address(issuer), address(rebalancer), address(feeManager));
+        assetToken = AssetFactory(factory).createAssetToken(getAsset(), 10000, address(issuer), address(rebalancer), address(feeManager), address(swap));
         vm.stopPrank();
 
         StakeToken stakeTokenImpl = new StakeToken();

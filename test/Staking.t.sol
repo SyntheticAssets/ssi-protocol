@@ -65,11 +65,11 @@ contract StakingTest is Test {
         AssetFactory factoryImpl = new AssetFactory();
         address factoryAddress = address(new ERC1967Proxy(
             address(factoryImpl),
-            abi.encodeCall(AssetFactory.initialize, (owner, swap, vault, "SETH", address(tokenImpl)))
+            abi.encodeCall(AssetFactory.initialize, (owner, vault, "SETH", address(tokenImpl)))
         ));
         factory = AssetFactory(factoryAddress);
         issuer = new AssetIssuer(owner, address(factory));
-        address assetTokenAddress = factory.createAssetToken(getAsset(), 10000, address(issuer), rebalancer, feeManager);
+        address assetTokenAddress = factory.createAssetToken(getAsset(), 10000, address(issuer), rebalancer, feeManager, swap);
         assetToken = AssetToken(assetTokenAddress);
         StakeToken stakeTokenImpl = new StakeToken();
         StakeFactory stakeFactoryImpl = new StakeFactory();

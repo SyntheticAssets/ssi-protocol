@@ -78,14 +78,16 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         return mintRequests[nonce];
     }
 
-    function addMintRequest(uint256 assetID, OrderInfo memory orderInfo) external whenNotPaused returns (uint) {
+    function addMintRequest(uint256 assetID, OrderInfo memory orderInfo, uint256 maxIssueFee) external whenNotPaused returns (uint) {
+        require(_issueFees.get(assetID) <= maxIssueFee, "current issue fee larger than max issue fee");
+        require(orderInfo.order.requester == msg.sender, "msg sender not order requester");
         require(_participants[assetID].contains(msg.sender), "msg sender not a participant");
         require(_minAmounts.contains(assetID) && _maxAmounts.contains(assetID), "issue amount range not set");
         require(_issueFees.contains(assetID), "issue fee not set");
         IAssetFactory factory = IAssetFactory(factoryAddress);
         address assetTokenAddress = factory.assetTokens(assetID);
         IAssetToken assetToken = IAssetToken(assetTokenAddress);
-        address swapAddress = factory.swap();
+        address swapAddress = factory.swaps(assetID);
         ISwap swap = ISwap(swapAddress);
         require(assetToken.feeCollected(), "has fee not collect");
         require(assetToken.rebalancing() == false, "is rebalancing");
@@ -105,7 +107,7 @@ contract AssetIssuer is AssetController, IAssetIssuer {
             require(inToken.balanceOf(msg.sender) >= transferAmount, "not enough balance");
             require(inToken.allowance(msg.sender, address(this)) >= transferAmount, "not enough allowance");
             if (inToken.allowance(address(this), swapAddress) < inTokenAmount) {
-                inToken.forceApprove(swapAddress, type(uint256).max);
+                inToken.forceApprove(swapAddress, inTokenAmount);
             }
             inToken.safeTransferFrom(msg.sender, address(this), transferAmount);
         }
@@ -173,8 +175,10 @@ contract AssetIssuer is AssetController, IAssetIssuer {
             IERC20 inToken = IERC20(tokenAddress);
             uint inTokenAmount = inTokenset[i].amount * order.inAmount / 10**8;
             uint feeTokenAmount = inTokenAmount * mintRequest.issueFee / 10**feeDecimals;
-            require(inToken.balanceOf(address(this)) >= feeTokenAmount, "not enough balance");
-            inToken.safeTransfer(vault, feeTokenAmount);
+            if (feeTokenAmount > 0) {
+                require(inToken.balanceOf(address(this)) >= feeTokenAmount, "not enough balance");
+                inToken.safeTransfer(vault, feeTokenAmount);
+            }
         }
         IAssetToken assetToken = IAssetToken(mintRequest.assetTokenAddress);
         assetToken.mint(mintRequest.requester, mintRequest.amount);
@@ -193,14 +197,16 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         return redeemRequests[nonce];
     }
 
-    function addRedeemRequest(uint256 assetID, OrderInfo memory orderInfo) external whenNotPaused returns (uint256) {
+    function addRedeemRequest(uint256 assetID, OrderInfo memory orderInfo, uint256 maxIssueFee) external whenNotPaused returns (uint256) {
+        require(_issueFees.get(assetID) <= maxIssueFee, "current issue fee larger than max issue fee");
+        require(orderInfo.order.requester == msg.sender, "msg sender not order requester");
         require(_participants[assetID].contains(msg.sender), "msg sender not a participant");
         require(_minAmounts.contains(assetID) && _maxAmounts.contains(assetID), "issue amount range not set");
         require(_issueFees.contains(assetID), "issue fee not set");
         IAssetFactory factory = IAssetFactory(factoryAddress);
         address assetTokenAddress = factory.assetTokens(assetID);
         IAssetToken assetToken = IAssetToken(assetTokenAddress);
-        address swapAddress = factory.swap();
+        address swapAddress = factory.swaps(assetID);
         ISwap swap = ISwap(swapAddress);
         require(assetToken.hasRole(assetToken.ISSUER_ROLE(), address(this)), "not a issuer");
         require(assetToken.feeCollected(), "has fee not collect");

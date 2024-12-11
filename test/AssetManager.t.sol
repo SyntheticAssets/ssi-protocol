@@ -37,7 +37,7 @@ contract FundManagerTest is Test {
         factoryImpl = new AssetFactory();
         address factoryAddress = address(new ERC1967Proxy(
             address(factoryImpl),
-            abi.encodeCall(AssetFactory.initialize, (owner, address(swap), vault, "SETH", address(tokenImpl)))
+            abi.encodeCall(AssetFactory.initialize, (owner, vault, "SETH", address(tokenImpl)))
         ));
         factory = AssetFactory(factoryAddress);
         issuer = new AssetIssuer(owner, address(factory));
@@ -82,7 +82,7 @@ contract FundManagerTest is Test {
 
     function createAssetToken() public returns (address) {
         vm.startPrank(owner);
-        address assetTokenAddress = factory.createAssetToken(getAsset(), maxFee, address(issuer), address(rebalancer), address(feeManager));
+        address assetTokenAddress = factory.createAssetToken(getAsset(), maxFee, address(issuer), address(rebalancer), address(feeManager), address(swap));
         IAssetToken assetToken = IAssetToken(assetTokenAddress);
         issuer.setIssueFee(assetToken.id(), 10000);
         issuer.setIssueAmountRange(assetToken.id(), Range({min:10*10**8, max:10000*10**8}));
@@ -111,7 +111,8 @@ contract FundManagerTest is Test {
             outAddressList: new string[](1),
             inAmount: 10 ** 8,
             outAmount: 3000 * 10 ** 8 / 10,
-            deadline: vm.getBlockTimestamp() + 60
+            deadline: vm.getBlockTimestamp() + 60,
+            requester: ap
         });
         order.inAddressList[0] = vm.toString(pmm);
         order.outAddressList[0] = vm.toString(vault);
@@ -133,7 +134,7 @@ contract FundManagerTest is Test {
         WETH.mint(ap, 10 ** WETH.decimals() * (10**8 + 10000) / 10**8);
         WETH.approve(address(issuer), 10 ** WETH.decimals() * (10**8 + 10000) / 10**8);
         uint amountBeforeMint = WETH.balanceOf(ap);
-        uint nonce = issuer.addMintRequest(assetToken.id(), orderInfo);
+        uint nonce = issuer.addMintRequest(assetToken.id(), orderInfo, 10000);
         vm.stopPrank();
         return (nonce, amountBeforeMint);
     }
@@ -198,7 +199,8 @@ contract FundManagerTest is Test {
             outAddressList: new string[](1),
             inAmount: 3000 * 10 ** 8 / 10,
             outAmount: 10 ** 8,
-            deadline: vm.getBlockTimestamp() + 60
+            deadline: vm.getBlockTimestamp() + 60,
+            requester: ap
         });
         order.inAddressList[0] = vm.toString(pmm);
         order.outAddressList[0] = vm.toString(address(issuer));
@@ -219,7 +221,7 @@ contract FundManagerTest is Test {
         IAssetToken assetToken = IAssetToken(assetTokenAddress);
         assetToken.approve(address(issuer), orderInfo.order.inAmount);
         uint amountBeforeRedeem = assetToken.balanceOf(ap);
-        uint nonce = issuer.addRedeemRequest(assetToken.id(), orderInfo);
+        uint nonce = issuer.addRedeemRequest(assetToken.id(), orderInfo, 10000);
         vm.stopPrank();
         return (nonce, amountBeforeRedeem);
     }
@@ -280,7 +282,8 @@ contract FundManagerTest is Test {
             outAddressList: new string[](1),
             inAmount: 10 ** 8,
             outAmount: 60000 * inTokenset[0].amount / 3000,
-            deadline: vm.getBlockTimestamp() + 60
+            deadline: vm.getBlockTimestamp() + 60,
+            requester: ap
         });
         order.inAddressList[0] = vm.toString(pmm);
         order.outAddressList[0] = vm.toString(vault);
@@ -333,7 +336,8 @@ contract FundManagerTest is Test {
             outAddressList: new string[](1),
             inAmount: 10 ** 8,
             outAmount: assetToken.getBasket()[0].amount * 60000 / 3000,
-            deadline: vm.getBlockTimestamp() + 60
+            deadline: vm.getBlockTimestamp() + 60,
+            requester: ap
         });
         order.inAddressList[0] = vm.toString(pmm);
         order.outAddressList[0] = vm.toString(vault);
@@ -447,7 +451,7 @@ contract FundManagerTest is Test {
         WETH.mint(ap, 10 ** WETH.decimals());
         WETH.approve(address(issuer), 10 ** WETH.decimals());
         vm.expectRevert();
-        issuer.addMintRequest(assetToken.id(), orderInfo);
+        issuer.addMintRequest(assetToken.id(), orderInfo, 10000);
         vm.stopPrank();
     }
 
@@ -547,7 +551,7 @@ contract FundManagerTest is Test {
         vm.stopPrank();
         vm.startPrank(ap);
         vm.expectRevert(bytes("mint amount not in range"));
-        issuer.addMintRequest(assetToken.id(), orderInfo);
+        issuer.addMintRequest(assetToken.id(), orderInfo, 10000);
         vm.stopPrank();
         vm.startPrank(owner);
         issuer.setIssueAmountRange(assetToken.id(), Range({
@@ -557,7 +561,7 @@ contract FundManagerTest is Test {
         vm.stopPrank();
         vm.startPrank(ap);
         vm.expectRevert(bytes("mint amount not in range"));
-        issuer.addMintRequest(assetToken.id(), orderInfo);
+        issuer.addMintRequest(assetToken.id(), orderInfo, 10000);
         vm.stopPrank();
     }
 
@@ -576,7 +580,7 @@ contract FundManagerTest is Test {
         vm.stopPrank();
         vm.startPrank(ap);
         vm.expectRevert(bytes("redeem amount not in range"));
-        issuer.addRedeemRequest(assetToken.id(), orderInfo);
+        issuer.addRedeemRequest(assetToken.id(), orderInfo, 10000);
         vm.stopPrank();
         vm.startPrank(owner);
         issuer.setIssueAmountRange(assetToken.id(), Range({
@@ -586,7 +590,7 @@ contract FundManagerTest is Test {
         vm.stopPrank();
         vm.startPrank(ap);
         vm.expectRevert(bytes("redeem amount not in range"));
-        issuer.addRedeemRequest(assetToken.id(), orderInfo);
+        issuer.addRedeemRequest(assetToken.id(), orderInfo, 10000);
         vm.stopPrank();
     }
 
@@ -614,7 +618,7 @@ contract FundManagerTest is Test {
         });
         maxFee = 10000;
         vm.startPrank(owner);
-        address assetTokenAddress = factory.createAssetToken(asset, maxFee, address(issuer), address(rebalancer), address(feeManager));
+        address assetTokenAddress = factory.createAssetToken(asset, maxFee, address(issuer), address(rebalancer), address(feeManager), address(swap));
         AssetToken assetToken = AssetToken(assetTokenAddress);
         issuer.setIssueFee(assetToken.id(), 10000);
         issuer.setIssueAmountRange(assetToken.id(), Range({min:10*10**8, max:10000*10**8}));
@@ -652,7 +656,8 @@ contract FundManagerTest is Test {
             outAddressList: outAddressList,
             inAmount: 100000000,
             outAmount: 98168567,
-            deadline: 1719484491
+            deadline: 1719484491,
+            requester: ap
         });
         bytes32 orderHash = keccak256(abi.encode(order));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(0x3, orderHash);
@@ -699,7 +704,7 @@ contract FundManagerTest is Test {
         swap.makerConfirmSwapRequest(orderInfo, outTxHashs);
         vm.stopPrank();
         vm.startPrank(owner);
-        issuer.rollbackSwapRequest(orderInfo);
+        issuer.rollbackSwapRequest(address(swap), orderInfo);
         vm.stopPrank();
         SwapRequest memory swapRequest = swap.getSwapRequest(orderInfo.orderHash);
         assertTrue(swapRequest.status == SwapRequestStatus.PENDING);
@@ -712,11 +717,11 @@ contract FundManagerTest is Test {
         (uint nonce, uint amountBeforeMint) = apAddMintRequest(assetTokenAddress, orderInfo);
         vm.startPrank(owner);
         vm.expectRevert();
-        issuer.cancelSwapRequest(orderInfo);
+        issuer.cancelSwapRequest(address(swap), orderInfo);
         vm.stopPrank();
         vm.startPrank(owner);
         vm.warp(block.timestamp + 1 hours);
-        issuer.cancelSwapRequest(orderInfo);
+        issuer.cancelSwapRequest(address(swap), orderInfo);
         vm.stopPrank();
         SwapRequest memory swapRequest = swap.getSwapRequest(orderInfo.orderHash);
         assertTrue(swapRequest.status == SwapRequestStatus.CANCEL);

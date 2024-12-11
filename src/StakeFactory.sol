@@ -102,4 +102,9 @@ contract StakeFactory is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         require(assetIDs.contains(assetID), "stake token not exists");
         StakeToken(stakeTokens[assetID]).unpause();
     }
+
+    function updateCooldown(uint256 assetID, uint48 cooldown) external onlyOwner {
+        require(assetIDs.contains(assetID), "stake token not exists");
+        StakeToken(stakeTokens[assetID]).setCooldown(cooldown);
+    }
 }

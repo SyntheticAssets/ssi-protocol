@@ -25,11 +25,13 @@ contract AssetController is Ownable, Pausable, IAssetController {
         require(orderInfo.orderHash == keccak256(abi.encode(orderInfo.order)), "order hash invalid");
     }
 
-    function rollbackSwapRequest(OrderInfo memory orderInfo) external onlyOwner {
-        ISwap(IAssetFactory(factoryAddress).swap()).rollbackSwapRequest(orderInfo);
+    function rollbackSwapRequest(address swap, OrderInfo memory orderInfo) external onlyOwner {
+        require(swap != address(0), "zero swap address");
+        ISwap(swap).rollbackSwapRequest(orderInfo);
     }
 
-    function cancelSwapRequest(OrderInfo memory orderInfo) external onlyOwner {
-        ISwap(IAssetFactory(factoryAddress).swap()).cancelSwapRequest(orderInfo);
+    function cancelSwapRequest(address swap, OrderInfo memory orderInfo) external onlyOwner {
+        require(swap != address(0), "zero swap address");
+        ISwap(swap).cancelSwapRequest(orderInfo);
     }
 }

@@ -32,7 +32,7 @@ contract AssetRebalancer is AssetController, IAssetRebalancer {
         IAssetFactory factory = IAssetFactory(factoryAddress);
         address assetTokenAddress = factory.assetTokens(assetID);
         IAssetToken assetToken = IAssetToken(assetTokenAddress);
-        address swapAddress = factory.swap();
+        address swapAddress = factory.swaps(assetID);
         ISwap swap = ISwap(swapAddress);
         require(assetToken.totalSupply() > 0, "zero supply");
         require(assetToken.feeCollected(), "has fee not collect");
@@ -47,8 +47,9 @@ contract AssetRebalancer is AssetController, IAssetRebalancer {
         Token[] memory newBasket = Utils.addTokenset(Utils.subTokenset(basket, outBasket), inBasket);
         Token[] memory newTokenset = Utils.muldivTokenset(newBasket, 10**assetToken.decimals(), assetToken.totalSupply());
         for (uint i = 0; i < newTokenset.length; i++) {
-            require(newTokenset[i].amount > 0, "too little left in new basket");
+            require(newTokenset[i].amount > 0, "zero token in new tokenset");
         }
+        require(!Utils.hasDuplicates(newTokenset), "duplicated tokens in new tokenset");
         swap.addSwapRequest(orderInfo, false, false);
         rebalanceRequests.push(Request({
             nonce: rebalanceRequests.length,
