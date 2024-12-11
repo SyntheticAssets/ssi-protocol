@@ -8,58 +8,46 @@ import "../src/Utils.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 contract DeployScript is Script {
+    ChristmasAirdrop public airdrop;
+
     function run() external {
-        // 设置
-        address[] memory recipients = new address[](3);
-        recipients[0] = 0x1234567890123456789012345678901234567890;
-        recipients[1] = 0x2345678901234567890123456789012345678901;
-        recipients[2] = 0x3456789012345678901234567890123456789012;
+        // setting
+        string memory merkleRootHex = vm.readFile(
+            "./test/data/merkle_root.txt"
+        );
+        bytes32 merkleRoot = vm.parseBytes32(merkleRootHex);
 
-        uint256[] memory amounts = new uint256[](3);
-        amounts[0] = 100 * 10**18;
-        amounts[1] = 200 * 10**18;
-        amounts[2] = 300 * 10**18;
-
-        address[] memory tokens = new address[](3);
-        tokens[0] = 0x2345678901234567890123456789012345678901;
-        tokens[1] = 0x2345678901234567890123456789012345678901;
-        tokens[2] = 0x2345678901234567890123456789012345678901;
-
-        bytes32[] memory leaves = new bytes32[](recipients.length);
-        for (uint256 i = 0; i < recipients.length; i++) {
-            leaves[i] = keccak256(abi.encodePacked(recipients[i], tokens[i], amounts[i]));
-        }
-        bytes32 merkleRoot = Utils.getMerkleRoot(leaves);
-        // 保存数据
-        string[] memory recipientsStr = new string[](recipients.length);
-        string[] memory amountsStr = new string[](amounts.length);
-        string[] memory tokensStr = new string[](tokens.length);
-        string[] memory leavesStr = new string[](leaves.length);
-
-        for (uint256 i = 0; i < recipients.length; i++) {
-            recipientsStr[i] = vm.toString(recipients[i]);
-            amountsStr[i] = vm.toString(amounts[i]);
-            tokensStr[i] = vm.toString(tokens[i]);
-            leavesStr[i] = vm.toString(leaves[i]);
-        }
-        string memory jsonData = vm.serializeString("data", "recipients", recipientsStr);
-        jsonData = vm.serializeString("data", "amounts", amountsStr);
-        jsonData = vm.serializeString("data", "tokens", tokensStr);
-        jsonData = vm.serializeString("data", "leaves", leavesStr);
-
-        vm.writeJson(jsonData, "./output/data.json");
-
-        // 部署
+        // deploy ChristmasAirdrop contract
+        uint256 expirationTime = block.timestamp + 7 days;
         vm.startBroadcast();
-        ChristmasAirdrop airdrop = new ChristmasAirdrop(merkleRoot);
+        airdrop = new ChristmasAirdrop(merkleRoot, expirationTime);
         vm.stopBroadcast();
 
-        // 为合约提供代币
-        for (uint256 i = 0; i < tokens.length; i++) {
-            IERC20(tokens[i]).approve(address(airdrop), amounts[i]);
-            IERC20(tokens[i]).transfer(address(airdrop), amounts[i]);
-        }
-
         console.log("ChristmasAirdrop deployed at:", address(airdrop));
+    }
+
+    function readAddressArray(
+        string memory filePath
+    ) internal view returns (address[] memory) {
+        string memory jsonData = vm.readFile(filePath);
+        bytes memory parsed = vm.parseJson(
+            jsonData,
+            string.concat(".", "tokens")
+        );
+        address[] memory addrArray = abi.decode(parsed, (address[]));
+        return addrArray;
+    }
+
+    function readUint256Array(
+        string memory filePath
+    ) internal view returns (uint256[] memory) {
+        string memory jsonData = vm.readFile(filePath);
+        bytes memory parsed = vm.parseJson(jsonData, ".amounts");
+        string[] memory strArray = abi.decode(parsed, (string[]));
+        uint256[] memory uintArray = new uint256[](strArray.length);
+        for (uint i = 0; i < strArray.length; i++) {
+            uintArray[i] = vm.parseUint(strArray[i]);
+        }
+        return uintArray;
     }
 }

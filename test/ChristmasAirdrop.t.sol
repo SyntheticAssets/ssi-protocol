@@ -7,9 +7,12 @@ import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../src/Utils.sol";
 
-
 contract MockERC20 is ERC20 {
-    constructor(string memory name, string memory symbol, uint256 initialSupply) ERC20(name, symbol) {
+    constructor(
+        string memory name,
+        string memory symbol,
+        uint256 initialSupply
+    ) ERC20(name, symbol) {
         _mint(msg.sender, initialSupply);
     }
 }
@@ -28,15 +31,14 @@ contract ChristmasAirdropTest is Test {
     bytes32[] public proof2;
 
     bytes32[] public leaves;
+    uint256 public expirationTime;
 
     function setUp() public {
         vm.startPrank(owner);
 
-        // 部署两个代币合约
         token1 = new MockERC20("Token1", "TK1", 1000 ether);
         token2 = new MockERC20("Token2", "TK2", 1000 ether);
 
-        // 设置接收者、金额和代币地址
         address[] memory recipients = new address[](2);
         recipients[0] = user1;
         recipients[1] = user2;
@@ -48,30 +50,42 @@ contract ChristmasAirdropTest is Test {
         address[] memory tokens = new address[](2);
         tokens[0] = address(token1);
         tokens[1] = address(token2);
-
-        // 生成 Merkle 树
         leaves = new bytes32[](recipients.length);
         for (uint256 i = 0; i < recipients.length; i++) {
-            leaves[i] = keccak256(abi.encodePacked(recipients[i], tokens[i], amounts[i]));
+            leaves[i] = keccak256(
+                abi.encodePacked(recipients[i], tokens[i], amounts[i])
+            );
         }
         merkleRoot = Utils.getMerkleRoot(leaves);
 
-        // 部署空投合约
-        airdrop = new ChristmasAirdrop(merkleRoot);
+        expirationTime = block.timestamp + 1 days;
+        airdrop = new ChristmasAirdrop(merkleRoot, expirationTime);
 
-        // 将代币转移到空投合约
         token1.transfer(address(airdrop), 100 ether);
         token2.transfer(address(airdrop), 200 ether);
 
-        // 生成 Merkle 证明
         proof1 = getProof(leaves, 0);
         proof2 = getProof(leaves, 1);
+
+        console.log(recipients[0]);
+        for (uint256 i = 0; i < proof1.length; i++) {
+            console.logBytes32(proof1[i]);
+        }
 
         vm.stopPrank();
     }
 
     function testDeployment() public {
         assertEq(airdrop.merkleRoot(), merkleRoot);
+        assertEq(airdrop.expirationTime(), expirationTime);
+    }
+
+    function testSetExpirationTime() public {
+        uint256 newExpirationTime = block.timestamp + 2 days;
+        vm.startPrank(owner);
+        airdrop.setExpirationTime(newExpirationTime);
+        assertEq(airdrop.expirationTime(), newExpirationTime);
+        vm.stopPrank();
     }
 
     function testSetMerkleRoot() public {
@@ -83,13 +97,19 @@ contract ChristmasAirdropTest is Test {
         vm.stopPrank();
     }
 
+    function testClaimAirdropAfterExpiration() public {
+        vm.warp(expirationTime + 1);
+
+        vm.prank(user1);
+        vm.expectRevert("Airdrop has expired");
+        airdrop.claimAirdrop(address(token1), 100 ether, proof1);
+    }
+
     function testClaimAirdrop() public {
-        // user1 领取空投
         vm.prank(user1);
         airdrop.claimAirdrop(address(token1), 100 ether, proof1);
         assertEq(token1.balanceOf(user1), 100 ether);
 
-        // 再次领取
         vm.startPrank(user1);
         vm.expectRevert("Airdrop already claimed for this token");
         airdrop.claimAirdrop(address(token1), 100 ether, proof1);
@@ -119,35 +139,30 @@ contract ChristmasAirdropTest is Test {
         proofs[0] = proof1;
         proofs[1] = proof2;
 
-        // owner 批量空投
         vm.prank(owner);
         airdrop.batchAirdrop(recipients, tokens, amounts, proofs);
 
-        // 验证用户的代币余额
         assertEq(token1.balanceOf(user1), 100 ether);
         assertEq(token2.balanceOf(user2), 200 ether);
 
-        // 再次批量空投，应当跳过已领取的用户
         vm.prank(owner);
         airdrop.batchAirdrop(recipients, tokens, amounts, proofs);
 
-        // 验证用户的代币余额未增加
         assertEq(token1.balanceOf(user1), 100 ether);
         assertEq(token2.balanceOf(user2), 200 ether);
     }
 
     function testWithdrawTokens() public {
-        // owner 提取剩余的 token1
         uint256 remaining = token1.balanceOf(address(airdrop));
         vm.prank(owner);
-        airdrop.withdrawTokens(address(token1), remaining);
-
-        // 验证 owner 收到代币
+        airdrop.withdrawTokens(owner, address(token1), remaining);
         assertEq(token1.balanceOf(owner), remaining + (1000 ether - 100 ether));
     }
 
-    // 工具函数：生成 Merkle 证明
-    function getProof(bytes32[] memory leaves, uint256 index) internal pure returns (bytes32[] memory proof) {
+    function getProof(
+        bytes32[] memory leaves,
+        uint256 index
+    ) internal pure returns (bytes32[] memory proof) {
         uint256 n = leaves.length;
         proof = new bytes32[](0);
         while (n > 1) {
@@ -169,13 +184,17 @@ contract ChristmasAirdropTest is Test {
         }
     }
 
-    // 工具函数：哈希两个节点
     function _hashPair(bytes32 a, bytes32 b) internal pure returns (bytes32) {
-        return a < b ? keccak256(abi.encodePacked(a, b)) : keccak256(abi.encodePacked(b, a));
+        return
+            a < b
+                ? keccak256(abi.encodePacked(a, b))
+                : keccak256(abi.encodePacked(b, a));
     }
 
-    // 工具函数：数组追加
-    function append(bytes32[] memory array, bytes32 value) internal pure returns (bytes32[] memory newArray) {
+    function append(
+        bytes32[] memory array,
+        bytes32 value
+    ) internal pure returns (bytes32[] memory newArray) {
         newArray = new bytes32[](array.length + 1);
         for (uint256 i = 0; i < array.length; i++) {
             newArray[i] = array[i];
