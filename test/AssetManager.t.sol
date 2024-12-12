@@ -834,4 +834,20 @@ contract FundManagerTest is Test {
         assertEq(outToken.balanceOf(ap), expectAmount - expectAmount * 10000 / 10**8);
         vm.stopPrank();
     }
+
+    function test_removeWhiteListTokens() public {
+        assertEq(swap.getWhiteListTokens().length, 2);
+        Token[] memory whiteListTokens = new Token[](1);
+        whiteListTokens[0] = Token({
+            chain: "SETH",
+            symbol: WBTC.symbol(),
+            addr: vm.toString(address(WBTC)),
+            decimals: WBTC.decimals(),
+            amount: 0
+        });
+        vm.startPrank(owner);
+        swap.removeWhiteListTokens(whiteListTokens);
+        vm.stopPrank();
+        assertEq(swap.getWhiteListTokens().length, 1);
+    }
 }
