@@ -37,6 +37,8 @@ contract Swap is AccessControl, Pausable, ISwap {
     event SetTakerAddresses(string[] receivers, string[] senders);
     event CancelSwapRequest(address indexed taker, bytes32 orderHash);
     event ForceCancelSwapRequest(bytes32 orderHash);
+    event AddWhiteListToken(Token token);
+    event RemoveWhiteListToken(Token token);
 
     constructor(address owner, string memory chain_) {
         _grantRole(DEFAULT_ADMIN_ROLE, owner);
@@ -258,19 +260,23 @@ contract Swap is AccessControl, Pausable, ISwap {
     function addWhiteListTokens(Token[] memory tokens) external onlyRole(DEFAULT_ADMIN_ROLE) {
         for (uint i = 0; i < tokens.length; i++) {
             bytes32 tokenHash = Utils.calcTokenHash(tokens[i]);
-            whiteListTokenHashs.add(tokenHash);
-            whiteListTokens[tokenHash].chain = tokens[i].chain;
-            whiteListTokens[tokenHash].symbol = tokens[i].symbol;
-            whiteListTokens[tokenHash].addr = tokens[i].addr;
-            whiteListTokens[tokenHash].decimals = tokens[i].decimals;
+            if (whiteListTokenHashs.add(tokenHash)) {
+                whiteListTokens[tokenHash].chain = tokens[i].chain;
+                whiteListTokens[tokenHash].symbol = tokens[i].symbol;
+                whiteListTokens[tokenHash].addr = tokens[i].addr;
+                whiteListTokens[tokenHash].decimals = tokens[i].decimals;
+                emit AddWhiteListToken(tokens[i]);
+            }
         }
     }
 
     function removeWhiteListTokens(Token[] memory tokens) external onlyRole(DEFAULT_ADMIN_ROLE) {
         for (uint i = 0; i < tokens.length; i++) {
             bytes32 tokenHash = Utils.calcTokenHash(tokens[i]);
-            whiteListTokenHashs.remove(tokenHash);
-            delete whiteListTokens[tokenHash];
+            if (whiteListTokenHashs.remove(tokenHash)) {
+                delete whiteListTokens[tokenHash];
+                emit RemoveWhiteListToken(tokens[i]);
+            }
         }
     }
 
