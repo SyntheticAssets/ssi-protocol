@@ -281,11 +281,11 @@ contract AssetIssuer is AssetController, IAssetIssuer {
             require(outToken.balanceOf(address(this)) >= outTokenAmount, "not enough balance");
             if (!force) {
                 outToken.safeTransfer(redeemRequest.requester, transferAmount);
-                outToken.safeTransfer(vault, feeTokenAmount);
             } else {
                 claimables[tokenAddress][redeemRequest.requester] += transferAmount;
                 tokenClaimables[tokenAddress] += transferAmount;
             }
+            outToken.safeTransfer(vault, feeTokenAmount);
         }
         assetToken.burn(redeemRequest.amount);
         redeemRequests[nonce].status = RequestStatus.CONFIRMED;
