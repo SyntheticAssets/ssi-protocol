@@ -26,6 +26,9 @@ contract Swap is AccessControl, Pausable, ISwap {
     uint256 public constant MAX_MARKER_CONFIRM_DELAY = 1 hours;
     uint256 public constant EXPIRATION = 6 hours;
 
+    EnumerableSet.Bytes32Set whiteListTokenHashs;
+    mapping(bytes32 => Token) public whiteListTokens;
+
     event AddSwapRequest(address indexed taker, bool inByContract, bool outByContract, OrderInfo orderInfo);
     event MakerConfirmSwapRequest(address indexed maker, bytes32 orderHash);
     event ConfirmSwapRequest(address indexed taker, bytes32 orderHash);
@@ -78,6 +81,16 @@ contract Swap is AccessControl, Pausable, ISwap {
         }
         if (keccak256(abi.encode(orderInfo.order.chain)) != keccak256(abi.encode(chain))) {
             return 9;
+        }
+        for (uint i = 0; i < orderInfo.order.inTokenset.length; i++) {
+            if (!whiteListTokenHashs.contains(Utils.calcTokenHash(orderInfo.order.inTokenset[i]))) {
+                return 10;
+            }
+        }
+        for (uint i = 0; i < orderInfo.order.outTokenset.length; i++) {
+            if (!whiteListTokenHashs.contains(Utils.calcTokenHash(orderInfo.order.outTokenset[i]))) {
+                return 11;
+            }
         }
         return 0;
     }
@@ -240,5 +253,39 @@ contract Swap is AccessControl, Pausable, ISwap {
 
     function getTakerAddresses() external view returns (string[] memory receivers, string[] memory senders) {
         return (takerReceivers, takerSenders);
+    }
+
+    function addWhiteListTokens(Token[] memory tokens) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint i = 0; i < tokens.length; i++) {
+            bytes32 tokenHash = Utils.calcTokenHash(tokens[i]);
+            whiteListTokenHashs.add(tokenHash);
+            whiteListTokens[tokenHash].chain = tokens[i].chain;
+            whiteListTokens[tokenHash].symbol = tokens[i].symbol;
+            whiteListTokens[tokenHash].addr = tokens[i].addr;
+            whiteListTokens[tokenHash].decimals = tokens[i].decimals;
+        }
+    }
+
+    function removeWhiteListTokens(Token[] memory tokens) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        for (uint i = 0; i < tokens.length; i++) {
+            bytes32 tokenHash = Utils.calcTokenHash(tokens[i]);
+            whiteListTokenHashs.remove(tokenHash);
+            delete whiteListTokens[tokenHash];
+        }
+    }
+
+    function getWhiteListTokens() external view returns (Token[] memory tokens) {
+        tokens = new Token[](whiteListTokenHashs.length());
+        for (uint i = 0; i < tokens.length; i++) {
+            tokens[i] = whiteListTokens[whiteListTokenHashs.at(i)];
+        }
+    }
+
+    function getWhiteListTokenLength() external view returns (uint256) {
+        return whiteListTokenHashs.length();
+    }
+
+    function getWhiteListToken(uint256 nonce) external view returns (Token memory token) {
+        return whiteListTokens[whiteListTokenHashs.at(nonce)];
     }
 }

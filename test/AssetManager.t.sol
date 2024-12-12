@@ -51,6 +51,22 @@ contract FundManagerTest is Test {
         outWhiteAddresses[0] = vm.toString(address(issuer));
         outWhiteAddresses[1] = vm.toString(vault);
         swap.setTakerAddresses(outWhiteAddresses, outWhiteAddresses);
+        Token[] memory whiteListTokens = new Token[](2);
+        whiteListTokens[0] = Token({
+            chain: "SETH",
+            symbol: WBTC.symbol(),
+            addr: vm.toString(address(WBTC)),
+            decimals: WBTC.decimals(),
+            amount: 0
+        });
+        whiteListTokens[1] = Token({
+            chain: "SETH",
+            symbol: WETH.symbol(),
+            addr: vm.toString(address(WETH)),
+            decimals: WETH.decimals(),
+            amount: 0
+        });
+        swap.addWhiteListTokens(whiteListTokens);
         vm.stopPrank();
     }
 
@@ -618,6 +634,22 @@ contract FundManagerTest is Test {
         });
         maxFee = 10000;
         vm.startPrank(owner);
+        Token[] memory whiteListTokens = new Token[](2);
+        whiteListTokens[0] = Token({
+            chain: "TBSC_BNB",
+            symbol: "TBSC_BNB",
+            addr: "",
+            decimals: 18,
+            amount: 0
+        });
+        whiteListTokens[1] = Token({
+            chain: "SETH",
+            symbol: "SETH",
+            addr: "",
+            decimals: 18,
+            amount: 0
+        });
+        swap.addWhiteListTokens(whiteListTokens);
         address assetTokenAddress = factory.createAssetToken(asset, maxFee, address(issuer), address(rebalancer), address(feeManager), address(swap));
         AssetToken assetToken = AssetToken(assetTokenAddress);
         issuer.setIssueFee(assetToken.id(), 10000);
