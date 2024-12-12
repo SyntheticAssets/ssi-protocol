@@ -151,6 +151,21 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         require(SignatureChecker.isValidSignatureNow(orderSigner, orderHash, orderSignature), "signature not valid");
     }
 
+    function setHedgeOrder(bytes32 orderHash, HedgeOrder calldata hedgeOrder) internal {
+        HedgeOrder storage hedgeOrder_ = hedgeOrders[orderHash];
+        hedgeOrder_.chain = hedgeOrder.chain;
+        hedgeOrder_.orderType = hedgeOrder.orderType;
+        hedgeOrder_.assetID = hedgeOrder.assetID;
+        hedgeOrder_.redeemToken = redeemToken;
+        hedgeOrder_.nonce = hedgeOrder.nonce;
+        hedgeOrder_.inAmount = hedgeOrder.inAmount;
+        hedgeOrder_.outAmount = hedgeOrder.outAmount;
+        hedgeOrder_.deadline = hedgeOrder.deadline;
+        hedgeOrder_.requester = hedgeOrder.requester;
+        hedgeOrder_.receiver = hedgeOrder.receiver;
+        orderHashs.add(orderHash);
+    }
+
     function applyMint(HedgeOrder calldata hedgeOrder, bytes calldata orderSignature) external onlyRole(PARTICIPANT_ROLE) whenNotPaused {
         require(hedgeOrder.requester == msg.sender, "msg sender is not requester");
         bytes32 orderHash = keccak256(abi.encode(hedgeOrder));
@@ -160,15 +175,7 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         IAssetToken assetToken = IAssetToken(IAssetFactory(factoryAddress).assetTokens(hedgeOrder.assetID));
         require(!assetToken.rebalancing(), "asset token is rebalancing");
         require(assetToken.feeCollected(), "asset token has fee not collected");
-        HedgeOrder storage hedgeOrder_ = hedgeOrders[orderHash];
-        hedgeOrder_.orderType = hedgeOrder.orderType;
-        hedgeOrder_.assetID = hedgeOrder.assetID;
-        hedgeOrder_.nonce = hedgeOrder.nonce;
-        hedgeOrder_.inAmount = hedgeOrder.inAmount;
-        hedgeOrder_.outAmount = hedgeOrder.outAmount;
-        hedgeOrder_.deadline = hedgeOrder.deadline;
-        hedgeOrder_.requester = hedgeOrder.requester;
-        orderHashs.add(orderHash);
+        setHedgeOrder(orderHash, hedgeOrder);
         orderStatus[orderHash] = HedgeOrderStatus.PENDING;
         requestTimestamps[orderHash] = block.timestamp;
         require(IERC20(assetToken).allowance(hedgeOrder.requester, address(this)) >= hedgeOrder.inAmount, "not enough allowance");
@@ -209,15 +216,7 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         checkHedgeOrder(hedgeOrder, orderHash, orderSignature);
         require(hedgeOrder.orderType == HedgeOrderType.REDEEM, "order type not match");
         require(allowance(hedgeOrder.requester, address(this)) >= hedgeOrder.inAmount, "not enough allowance");
-        HedgeOrder storage hedgeOrder_ = hedgeOrders[orderHash];
-        hedgeOrder_.orderType = hedgeOrder.orderType;
-        hedgeOrder_.redeemToken = hedgeOrder.redeemToken;
-        hedgeOrder_.nonce = hedgeOrder.nonce;
-        hedgeOrder_.inAmount = hedgeOrder.inAmount;
-        hedgeOrder_.outAmount = hedgeOrder.outAmount;
-        hedgeOrder_.deadline = hedgeOrder.deadline;
-        hedgeOrder_.requester = hedgeOrder.requester;
-        orderHashs.add(orderHash);
+        setHedgeOrder(orderHash, hedgeOrder);
         orderStatus[orderHash] = HedgeOrderStatus.PENDING;
         requestTimestamps[orderHash] = block.timestamp;
         IERC20(address(this)).safeTransferFrom(hedgeOrder.requester, address(this), hedgeOrder.inAmount);
