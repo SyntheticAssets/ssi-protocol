@@ -25,7 +25,6 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
     enum HedgeOrderStatus { NONE, PENDING, REJECTED, CONFIRMED }
 
     struct HedgeOrder {
-        string chain;
         HedgeOrderType orderType;
         uint256 assetID;
         address redeemToken;
@@ -35,6 +34,7 @@ contract USSI is Initializable, OwnableUpgradeable, AccessControlUpgradeable, ER
         uint256 deadline;
         address requester;
         address receiver;
+        string chain;
     }
 
     EnumerableSet.Bytes32Set orderHashs;
