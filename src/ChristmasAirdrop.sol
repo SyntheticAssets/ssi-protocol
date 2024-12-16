@@ -1,17 +1,20 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.25;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+// import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 
 import "forge-std/console.sol";
 
 contract ChristmasAirdrop is Ownable, Pausable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     bytes32 public merkleRoot;
-    mapping(address => mapping(address => bool)) public hasClaimed;
+    mapping(address => mapping(address => uint256)) public hasClaimed;
     uint256 public expirationTime;
 
     event AirdropClaimed(
@@ -41,31 +44,39 @@ contract ChristmasAirdrop is Ownable, Pausable, ReentrancyGuard {
         emit MerkleRootUpdated(_merkleRoot);
     }
 
-    function claimAirdrop(
+    function _claim(
+        address recipient,
         address token,
         uint256 amount,
         bytes32[] calldata proof
-    ) external nonReentrant {
+    ) internal {
         require(block.timestamp <= expirationTime, "Airdrop has expired");
-        require(
-            !hasClaimed[msg.sender][token],
-            "Airdrop already claimed for this token"
-        );
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, token, amount));
+        uint256 claimed = hasClaimed[recipient][token];
+        uint256 claimableAmount = amount - claimed;
+        require(claimableAmount > 0, "No remaining tokens to claim");
+        bytes32 leaf = keccak256(abi.encodePacked(recipient, token, amount));
         // Verify Merkle Proof
         require(
             MerkleProof.verify(proof, merkleRoot, leaf),
             "Invalid Merkle Proof"
         );
-        hasClaimed[msg.sender][token] = true;
+        hasClaimed[recipient][token] = amount;
         require(
-            IERC20(token).transfer(msg.sender, amount),
+            IERC20(token).transfer(recipient, amount),
             "Token transfer failed"
         );
-        emit AirdropClaimed(msg.sender, token, amount);
+        emit AirdropClaimed(recipient, token, amount);
     }
 
-    function batchAirdrop(
+    function claim(
+        address token,
+        uint256 amount,
+        bytes32[] calldata proof
+    ) external nonReentrant {
+        _claim(msg.sender, token, amount, proof);
+    }
+
+    function batchClaim(
         address[] calldata recipients,
         address[] calldata tokens,
         uint256[] calldata amounts,
@@ -86,18 +97,10 @@ contract ChristmasAirdrop is Ownable, Pausable, ReentrancyGuard {
             if (block.timestamp > expirationTime) {
                 break;
             }
-            if (!hasClaimed[recipient][token]) {
-                bytes32 leaf = keccak256(
-                    abi.encodePacked(recipient, token, amount)
-                );
-                if (MerkleProof.verify(proof, merkleRoot, leaf)) {
-                    hasClaimed[recipient][token] = true;
-                    require(
-                        IERC20(token).transfer(recipient, amount),
-                        "Token transfer failed"
-                    );
-                    emit AirdropClaimed(recipient, token, amount);
-                }
+            uint256 claimed = hasClaimed[recipient][token];
+            uint256 claimableAmount = amount - claimed;
+            if (claimableAmount > 0) {
+                _claim(recipient, token, amount, proof);
             }
         }
     }
@@ -109,7 +112,7 @@ contract ChristmasAirdrop is Ownable, Pausable, ReentrancyGuard {
     ) external onlyOwner nonReentrant {
         uint256 balance = IERC20(token).balanceOf(address(this));
         require(amount <= balance, "Insufficient token balance");
-        require(IERC20(token).transfer(to, amount), "Token transfer failed");
+        IERC20(token).safeTransfer(to, amount);
         emit TokensWithdrawn(to, token, amount);
     }
 }
