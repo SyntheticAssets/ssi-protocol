@@ -109,9 +109,6 @@ contract AssetIssuer is AssetController, IAssetIssuer {
             uint transferAmount = inTokenAmount + feeTokenAmount;
             require(inToken.balanceOf(msg.sender) >= transferAmount, "not enough balance");
             require(inToken.allowance(msg.sender, address(this)) >= transferAmount, "not enough allowance");
-            if (inToken.allowance(address(this), swapAddress) < inTokenAmount) {
-                inToken.forceApprove(swapAddress, inTokenAmount);
-            }
             inToken.safeTransferFrom(msg.sender, address(this), transferAmount);
         }
         swap.addSwapRequest(orderInfo, true, false);
@@ -166,6 +163,10 @@ contract AssetIssuer is AssetController, IAssetIssuer {
         ISwap swap = ISwap(mintRequest.swapAddress);
         SwapRequest memory swapRequest = swap.getSwapRequest(mintRequest.orderHash);
         require(swapRequest.status == SwapRequestStatus.MAKER_CONFIRMED);
+        for (uint i = 0; i < orderInfo.order.inTokenset.length; i++) {
+            address tokenAddress = Utils.stringToAddress(orderInfo.order.inTokenset[i].addr);
+            IERC20(tokenAddress).forceApprove(address(swap), orderInfo.order.inTokenset[i].amount * orderInfo.order.inAmount / 10**8);
+        }
         swap.confirmSwapRequest(orderInfo, inTxHashs);
         Token[] memory inTokenset = orderInfo.order.inTokenset;
         IAssetFactory factory = IAssetFactory(factoryAddress);
