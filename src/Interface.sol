@@ -21,6 +21,7 @@ struct Asset {
 }
 
 struct Order {
+    string chain;
     address maker;
     uint256 nonce;
     Token[] inTokenset;
@@ -31,7 +32,6 @@ struct Order {
     uint256 outAmount;
     uint256 deadline;
     address requester;
-    string chain;
 }
 
 struct OrderInfo {
